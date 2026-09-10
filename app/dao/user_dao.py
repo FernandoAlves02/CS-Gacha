@@ -10,7 +10,7 @@ class User_DAO(DAO):
 
         try:
             sql = """
-                    INSERT INTO USUER
+                    INSERT INTO USERS
                     (
                         USERNAME,
                         PASSWORD,
@@ -57,11 +57,9 @@ class User_DAO(DAO):
                         ID,
                         USERNAME,
                         EMAIL,
-                        BALANCE,
+                        BALANCE
                     FROM
-                        USER
-                    ORDER BY
-                        NOME
+                        USERS
                   """
 
             cursor.execute(sql)
@@ -102,7 +100,7 @@ class User_DAO(DAO):
                         EMAIL,
                         BALANCE
                     FROM
-                        USER
+                        USERS
                     WHERE
                         ID = %s
                   """
@@ -125,6 +123,43 @@ class User_DAO(DAO):
         finally:
             self.disconnect(cursor, connection)
 
+    def get_by_email(self, email):
+
+        connection, cursor = self.connect()
+
+        try:
+
+            sql = """
+                    SELECT
+                        ID,
+                        USERNAME,
+                        PASSWORD,
+                        EMAIL,
+                        BALANCE
+                    FROM
+                        USERS
+                    WHERE
+                        EMAIL = %s
+                  """
+
+            cursor.execute(sql, (email,))
+
+            data = cursor.fetchone()
+
+            if data is None:
+                return None
+
+            return User(
+                data[0],
+                data[1],
+                data[2],
+                data[3],
+                data[4]
+            )
+
+        finally:
+            self.disconnect(cursor, connection)
+
     def update(self, user):
 
         connection, cursor = self.connect()
@@ -132,7 +167,7 @@ class User_DAO(DAO):
         try:
 
             sql = """
-                    UPDATE USER
+                    UPDATE USERS
                     SET
                         USERNAME = %s,
                         PASSWORD = %s,
@@ -172,7 +207,7 @@ class User_DAO(DAO):
 
             sql = """
                     DELETE
-                    FROM USER
+                    FROM USERS
                     WHERE
                         ID = %s
                   """

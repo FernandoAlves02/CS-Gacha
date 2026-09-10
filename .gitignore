@@ -5,3 +5,5 @@ env/
 .vscode/
 __pycache__/
 *.pyc
+Assets/
+.Assets/

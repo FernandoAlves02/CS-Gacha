@@ -19,8 +19,8 @@ class HomeView(ShowBase):
 
         # 2. Assets
         project_root = Path(__file__).resolve().parent.parent.parent
-        map_path = project_root / "app" / "assets" / "maps" / "de_mirage_d.glb"
-        ct_path = project_root / "app" / "assets" / "characters" / "ctm_spawnpoint.glb"
+        map_path = project_root / "app" / "Assets" / "Maps" / "de_mirage.glb"
+        ct_path = project_root / "app" / "Assets" / "Characters" / "ctm_spawnpoint.glb"
 
         panda_map_path = Filename.fromOsSpecific(str(map_path))
         panda_ct_path = Filename.fromOsSpecific(str(ct_path))
@@ -40,15 +40,15 @@ class HomeView(ShowBase):
 
         # 4. Câmera
         self.disableMouse()  
-        self.camera.setPos(Point3(-33.60, 19.90, -1.70))
+        self.camera.setPos(Point3(-33.60, 19.90, -2.70))
         self.camera.setHpr(Vec3(130, 0, 0))
         self.camLens.setFov(80)
 
         self.ct_node = self.loader.loadModel(panda_ct_path)
         self.ct_node.reparentTo(self.camera)
 
-        self.ct_node.setPos(1.2, 3.5, -1.7) 
-        self.ct_node.setHpr(0, 90, 0)
+        self.ct_node.setPos(0.1, 3.2, -1.2) 
+        self.ct_node.setHpr(2, 90, 0)
 
         # 5. Iluminação de Alto Contraste
         self.setup_lights()

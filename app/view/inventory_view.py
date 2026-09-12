@@ -19,8 +19,8 @@ class InventoryView(ShowBase):
 
         # 2. Assets
         project_root = Path(__file__).resolve().parent.parent.parent
-        map_path = project_root / "app" / "assets" / "maps" / "de_mirage_d.glb"
-        ct_path = project_root / "app" / "assets" / "characters" / "ctm_spawnpoint.glb"
+        map_path = project_root / "app" / "Assets" / "Maps" / "de_mirage.glb"
+        ct_path = project_root / "app" / "Assets" / "Characters" / "ctm_spawnpoint.glb"
 
         panda_map_path = Filename.fromOsSpecific(str(map_path))
         panda_ct_path = Filename.fromOsSpecific(str(ct_path))

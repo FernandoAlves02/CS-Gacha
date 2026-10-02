@@ -33,7 +33,8 @@ from panda3d.core import (
 
 from app.controller.login_controller import Login_Controller
 from app.controller.user_controller import User_Controller
-from app.core.paths import FONTS_DIR, UI_DIR
+from app.core.paths import UI_DIR
+from app.view.ui_kit import fonte_inter
 
 logger = logging.getLogger(__name__)
 
@@ -130,8 +131,10 @@ class LoginRegisterView:
         self.login_controller = Login_Controller(user_dao, self, self._ao_autenticar)
         self.user_controller = User_Controller(user_dao, self, self._ao_cadastrar)
 
-        self.fonte = self._fonte("Inter-Regular.otf")
-        self.fonte_bold = self._fonte("Inter-Bold.otf")
+        # Fonte Inter na resolução certa para o tamanho dos textos desta tela
+        # (detalhes em ui_kit.fonte_inter). Sem o arquivo, usa a fonte padrão.
+        self.fonte = fonte_inter(self.app, negrito=False, escala=FONTE_CAMPO * PX)
+        self.fonte_bold = fonte_inter(self.app, negrito=True, escala=FONTE_BOTAO * PX)
         if self.fonte_bold is None:
             self.fonte_bold = self.fonte
 
@@ -337,18 +340,6 @@ class LoginRegisterView:
             imagem.setTransparency(TransparencyAttrib.MAlpha)
         self.elementos.append(imagem)
         return imagem
-
-    def _fonte(self, arquivo):
-        """Carrega uma fonte de app/assets/fonts. Se falhar, usa a fonte padrão do Panda3D."""
-        caminho = FONTS_DIR / arquivo
-        try:
-            fonte = self.app.loader.loadFont(Filename.fromOsSpecific(str(caminho)))
-        except Exception:
-            logger.warning("Fonte não carregada: %s (usando a padrão)", caminho)
-            return None
-        if hasattr(fonte, "setPixelsPerUnit"):
-            fonte.setPixelsPerUnit(48)        # letras mais nítidas
-        return fonte
 
     # ==================================================================
     # MODOS, FOCO E TECLADO

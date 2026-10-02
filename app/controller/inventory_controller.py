@@ -1,7 +1,7 @@
 import logging
 import random
 
-from app.core.drop_service import draw_drop
+from app.core.drop_service import draw_drop, drop_table
 from app.core.game_rules import INVENTORY_LIMIT, format_money
 from app.models.drop_result import Drop_Result
 from app.models.skin_instance import Skin_Instance
@@ -54,6 +54,19 @@ class Inventory_Controller:
     # ----------------------------------------------------------
     # ABRIR CAIXA
     # ----------------------------------------------------------
+
+    def case_contents(self, collection_id):
+        """O que pode sair da caixa, com a chance de cada item: lista de (Skin_Catalog, chance).
+        Usado na tela de abertura (prévia do conteúdo e cartões da roleta)."""
+        try:
+            items = self.collection_dao.get_items(collection_id)
+            return drop_table(items, {item.rarity_id: item.rarity.probability for item in items})
+        except ValueError as e:
+            self.view.show_message(str(e), False)
+        except Exception:
+            logger.exception("Falha ao carregar o conteúdo da caixa")
+            self.view.show_message("Não foi possível carregar o conteúdo da caixa.", False)
+        return []
 
     def open_case(self, collection_id):
         """Abre 1 caixa e devolve um Drop_Result (ou None se não deu certo).

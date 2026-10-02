@@ -209,3 +209,52 @@ class Skin_Catalog_DAO(Read_Only_DAO):
 
         finally:
             self.disconnect(cursor, connection)
+
+    def get_history_for_listings(self, listings, points_per_listing=60):
+        """Histórico RECENTE de vários anúncios numa consulta só (para o ▲▼ de uma página do mercado).
+
+        listings: lista de (skin_catalog_id, desgaste).
+        Devolve {(skin_catalog_id, desgaste): [(data, preço), ...]}, do mais antigo
+        para o mais novo, com no máximo `points_per_listing` pontos por anúncio
+        (60 passadas do coletor ~ 3 dias: sobra para a variação de 24 h e a
+        consulta não fica mais lenta à medida que o histórico cresce).
+        Anúncio sem histórico fica com lista vazia.
+        """
+        pares = list(dict.fromkeys(listings))       # sem repetidos, mantendo a ordem
+        if not pares:
+            return {}
+        ids = sorted({skin_id for skin_id, _wear in pares})
+        wears = sorted({wear for _skin_id, wear in pares})
+
+        connection, cursor = self.connect()
+
+        try:
+            # ROW_NUMBER() numera os pontos de cada anúncio do mais novo (1) para o
+            # mais antigo; o SELECT de fora fica só com os N mais novos de cada um.
+            sql = f"""
+                    SELECT skin_catalog_id, wear, captured_at, price
+                    FROM (
+                        SELECT skin_catalog_id, wear, captured_at, price, id,
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY skin_catalog_id, wear
+                                   ORDER BY captured_at DESC, id DESC
+                               ) AS ordem
+                        FROM price_history
+                        WHERE skin_catalog_id IN ({", ".join(["%s"] * len(ids))})
+                          AND wear IN ({", ".join(["%s"] * len(wears))})
+                    ) recentes
+                    WHERE ordem <= %s
+                    ORDER BY captured_at, id
+                  """
+
+            cursor.execute(sql, tuple(ids) + tuple(wears) + (int(points_per_listing),))
+
+            historico = {par: [] for par in pares}
+            for skin_id, wear, data, preco in cursor.fetchall():
+                pontos = historico.get((skin_id, wear))
+                if pontos is not None:              # ignora combinações que não estão na página
+                    pontos.append((data, preco))
+            return historico
+
+        finally:
+            self.disconnect(cursor, connection)

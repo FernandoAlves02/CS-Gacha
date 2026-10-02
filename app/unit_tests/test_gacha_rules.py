@@ -8,6 +8,7 @@ Rodar da raiz do projeto:
 import random
 import unittest
 from collections import Counter
+from datetime import datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 
@@ -152,6 +153,29 @@ class DrawTests(unittest.TestCase):
         item, valor, desgaste = drop.draw_drop(caixa_completa(), PROBS, rng)
         self.assertIn(item.id, [s.id for s in caixa_completa()])
         self.assertEqual(desgaste, rules.wear_from_float(valor))
+
+
+class PriceChangeTests(unittest.TestCase):
+    """Variação de preço do mercado (▲▼): último preço contra o de ~24 h antes."""
+
+    INICIO = datetime(2026, 10, 3, 8, 0)
+
+    def pontos(self, *precos, passo_min=80):
+        return [(self.INICIO + timedelta(minutes=passo_min * i), Decimal(p)) for i, p in enumerate(precos)]
+
+    def test_compara_com_o_ponto_de_24_horas_antes(self):
+        # 25 pontos de 1 em 1 hora: o ponto de referência é o de 24 h antes do último
+        historico = self.pontos(*(["10.00"] + ["50.00"] * 23 + ["12.00"]), passo_min=60)
+        self.assertEqual(rules.price_change(historico), (Decimal("20.0"), 24))
+
+    def test_historico_curto_usa_o_primeiro_ponto(self):
+        historico = self.pontos("10.00", "10.50", "9.00")         # só 2 h 40 de histórico
+        self.assertEqual(rules.price_change(historico), (Decimal("-10.0"), 3))
+
+    def test_sem_pontos_suficientes(self):
+        self.assertIsNone(rules.price_change([]))
+        self.assertIsNone(rules.price_change(self.pontos("10.00")))
+        self.assertIsNone(rules.price_change(self.pontos("0.00", "5.00")))
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ import math
 import random
 
 from app.core.drop_service import drop_table, float_for_wear
-from app.core.game_rules import INVENTORY_LIMIT, format_money
+from app.core.game_rules import INVENTORY_LIMIT, format_money, price_change
 from app.models.skin_instance import Skin_Instance
 
 logger = logging.getLogger(__name__)
@@ -29,13 +29,15 @@ class Market_Controller:
         4. buy_case(...) / buy_skin(...) -> o DAO confere TUDO de novo dentro da transação
     """
 
-    def __init__(self, collection_dao, skin_catalog_dao, inventory_dao, view, user, rng=random):
+    def __init__(self, collection_dao, skin_catalog_dao, inventory_dao, view, user, rng=random,
+                 rarity_dao=None):
         self.collection_dao = collection_dao
         self.skin_catalog_dao = skin_catalog_dao
         self.inventory_dao = inventory_dao
         self.view = view
         self.user = user
         self.rng = rng          # nos testes passamos random.Random(semente)
+        self.rarity_dao = rarity_dao    # só para os filtros de raridade da aba SKINS
 
     # ----------------------------------------------------------
     # LISTAGENS
@@ -64,6 +66,16 @@ class Market_Controller:
             self.view.show_message("Não foi possível carregar o conteúdo da caixa.", False)
         return []
 
+    def list_rarities(self):
+        """Raridades para os filtros da aba SKINS (lista de Rarity, da mais comum para a mais rara)."""
+        if self.rarity_dao is None:
+            return []
+        try:
+            return self.rarity_dao.get_all()
+        except Exception:
+            logger.exception("Falha ao listar raridades")
+            return []
+
     def list_skins(self, search="", page=0, rarity_id=None):
         """Skins à venda, paginadas. Devolve (lista de (Skin_Catalog, Market_Price), total de páginas)."""
         try:
@@ -85,6 +97,26 @@ class Market_Controller:
             logger.exception("Falha ao carregar preços")
             self.view.show_message("Não foi possível carregar os preços.", False)
             return []
+
+    def price_changes(self, listings):
+        """Variação recente (▲▼) de cada anúncio da página.
+
+        listings: o que list_skins devolveu [(Skin_Catalog, Market_Price)].
+        Devolve {(skin_id, desgaste): (variação em %, horas)}; anúncio sem
+        histórico suficiente fica de fora. Falha aqui não atrapalha a tela.
+        """
+        try:
+            pares = [(skin.id, preco.wear) for skin, preco in listings]
+            historico = self.skin_catalog_dao.get_history_for_listings(pares)
+        except Exception:
+            logger.exception("Falha ao carregar a variação dos preços")
+            return {}
+        variacoes = {}
+        for par, pontos in historico.items():
+            variacao = price_change(pontos)
+            if variacao is not None:
+                variacoes[par] = variacao
+        return variacoes
 
     def price_history(self, skin_catalog_id=None, wear=None, collection_id=None, limit=30):
         """Histórico (data, preço) de uma skin+desgaste OU de uma caixa (para gráfico)."""

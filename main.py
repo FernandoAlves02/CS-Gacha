@@ -21,10 +21,15 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.controller.view_manager import ViewManager
 from app.core.database import Database
+from app.dao.collection_dao import Collection_DAO
+from app.dao.inventory_dao import Inventory_DAO
+from app.dao.rarity_dao import Rarity_DAO
+from app.dao.skin_catalog_dao import Skin_Catalog_DAO
 from app.dao.user_dao import User_DAO
 from app.view.home_view import HomeView
 from app.view.inventory_view import InventoryView
 from app.view.login_register_view import LoginRegisterView
+from app.view.market_view import MarketView
 from app.view.scene_backdrop import SceneBackdrop
 
 logging.basicConfig(level=logging.INFO)
@@ -42,8 +47,13 @@ class CSGachaMain(ShowBase):
         #    em render2d tudo ficaria esticado em janelas que não são quadradas)
         self.view_manager = ViewManager(self.aspect2d, self)
 
-        # 2. Dependências compartilhadas entre as telas
-        self.view_manager.user_dao = User_DAO(Database())
+        # 2. Dependências compartilhadas entre as telas (todos os DAOs usam o mesmo banco)
+        database = Database()
+        self.view_manager.user_dao = User_DAO(database)
+        self.view_manager.collection_dao = Collection_DAO(database)
+        self.view_manager.skin_catalog_dao = Skin_Catalog_DAO(database)
+        self.view_manager.inventory_dao = Inventory_DAO(database)
+        self.view_manager.rarity_dao = Rarity_DAO(database)
         self.view_manager.backdrop = SceneBackdrop(self)
 
         # 3. Rotas
@@ -56,6 +66,7 @@ class CSGachaMain(ShowBase):
         self.view_manager.registrar_tela_base("login", LoginRegisterView)
         self.view_manager.registrar_tela_base("home", HomeView)
         self.view_manager.registrar_tela_base("inventory", InventoryView)
+        self.view_manager.registrar_tela_base("shop", MarketView)      # botão MERCADO do header
 
 
 if __name__ == "__main__":

@@ -9,6 +9,8 @@ TASK_AGUARDAR_CENARIO = "home_aguardar_cenario"
 
 class HomeView(GameViewBase):
 
+    ROTA = "home"
+
     def construir_conteudo(self):
         # Por enquanto a Home é só o cenário 3D + header, como no layout original.
         backdrop = self.view_manager.backdrop

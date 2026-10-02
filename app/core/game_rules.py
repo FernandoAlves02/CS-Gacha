@@ -9,6 +9,7 @@ testar (veja app/unit_tests/test_gacha_rules.py).
 Dinheiro usa Decimal (nunca float) para não ter erro de arredondamento,
 igual à coluna DECIMAL(10,2) do banco.
 """
+from datetime import timedelta
 from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 
 CENT = Decimal("0.01")                 # precisão do dinheiro (2 casas)
@@ -191,3 +192,32 @@ def estimated_price(rarity_name, wear):
     base = RARITY_BASE_PRICE.get(rarity_name, RARITY_BASE_PRICE["Mil-Spec Grade"])
     fator = WEAR_PRICE_FACTOR.get(wear, Decimal("1.00"))
     return to_money(base * fator)
+
+
+def price_change(history, hours=24):
+    """Variação do preço para o ▲▼ do mercado.
+
+    history: lista de (data, preço) do mais antigo para o mais novo (como os
+    DAOs devolvem). Compara o ÚLTIMO preço com o ponto mais recente que tenha
+    pelo menos `hours` horas a menos. Se o histórico ainda for mais curto que
+    isso, compara com o PRIMEIRO ponto (e as horas devolvidas mostram o período real).
+
+    Devolve (variação em %, horas entre os dois pontos), ou None quando há
+    menos de 2 pontos ou o preço de referência é zero.
+    Ex.: [(sex 08h, 10.00), (sáb 08h, 11.00)] -> (Decimal("10.0"), 24)
+    """
+    if not history or len(history) < 2:
+        return None
+    ultima_data, ultimo_preco = history[-1]
+    limite = ultima_data - timedelta(hours=hours)
+    ref_data, ref_preco = history[0]
+    for data, preco in history[:-1]:
+        if data > limite:
+            break
+        ref_data, ref_preco = data, preco      # o mais recente que ainda está fora da janela
+    ref_preco = Decimal(str(ref_preco))
+    if ref_preco <= 0:
+        return None
+    variacao = (Decimal(str(ultimo_preco)) - ref_preco) / ref_preco * Decimal("100")
+    horas = int(round((ultima_data - ref_data).total_seconds() / 3600))
+    return variacao.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP), horas

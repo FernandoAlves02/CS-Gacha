@@ -18,6 +18,10 @@ class ViewManager:
 
         # Dependências compartilhadas, preenchidas no main.py
         self.user_dao = None
+        self.collection_dao = None      # caixas e conteúdo (Mercado e Inventário)
+        self.skin_catalog_dao = None    # skins e preços (Mercado)
+        self.inventory_dao = None       # compras, aberturas e vendas
+        self.rarity_dao = None          # probabilidades (abertura de caixa)
         self.backdrop = None
 
         # Sessão: usuário logado (None = ninguém logado)

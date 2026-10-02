@@ -112,11 +112,23 @@ def download(url, cache_name, needs_brotli=False, timeout=120):
 
 
 def _describe_error(error):
+    """Mensagem curta e COMPLETA do erro, para sabermos exatamente o que a API respondeu."""
     if isinstance(error, urllib.error.HTTPError):
         if error.code == 429:
-            return "limite de chamadas da API; aguarde 5 minutos"
-        return f"HTTP {error.code}"
-    return str(error) or error.__class__.__name__
+            return "HTTP 429: limite de chamadas da API; aguarde 5 minutos"
+        detalhe = ""
+        try:   # o corpo da resposta de erro costuma dizer o motivo
+            corpo = error.read()
+            codificacao = (error.headers.get("Content-Encoding") or "").lower()
+            if codificacao == "br" and brotli is not None:
+                corpo = brotli.decompress(corpo)
+            elif codificacao == "gzip":
+                corpo = gzip.decompress(corpo)
+            detalhe = " ".join(corpo.decode("utf-8", "replace").split())[:300]
+        except Exception:
+            pass
+        return f"HTTP {error.code} {error.reason}" + (f" | resposta: {detalhe}" if detalhe else "")
+    return f"{error.__class__.__name__}: {error}"
 
 
 # ======================================================================
@@ -539,15 +551,23 @@ def main(argv=None):
         print("3/4 Baixando preços em R$ (Skinport)...")
         try:
             items_json, _ = download(SKINPORT_ITEMS_URL, "skinport_items.json", needs_brotli=True)
-            history_json, _ = download(SKINPORT_HISTORY_URL, "skinport_history.json", needs_brotli=True)
-            prices = index_prices(items_json, history_json)
         except RuntimeError as error:
+            items_json = None
             print(f"  ! Sem preços reais nesta execução: {error}")
+        if items_json is not None:
+            # O histórico só traz as médias de 7/30 dias: se falhar, os preços atuais continuam valendo.
+            try:
+                history_json, _ = download(SKINPORT_HISTORY_URL, "skinport_history.json", needs_brotli=True)
+            except RuntimeError as error:
+                history_json = []
+                print(f"  ! Médias de 7/30 dias indisponíveis nesta execução: {error}")
+            prices = index_prices(items_json, history_json)
     total = update_prices(database, prices)
     print(
         f"    skins: {total['reais']} preços reais | {total['estimados']} estimados | "
         f"{total['mantidos']} mantidos | caixas com preço real: {total['caixas_reais']}"
     )
+    sem_preco_real = not args.sem_precos and total["reais"] == 0 and total["caixas_reais"] == 0
 
     if args.imagens:
         print("4/4 Baixando imagens (pode demorar alguns minutos)...")
@@ -561,6 +581,15 @@ def main(argv=None):
         conteudo = [skins[s]["rarity_name"] for c, s in ligacoes if c == caixa["api_id"]]
         por_raridade = ", ".join(f"{n}: {conteudo.count(n)}" for n in dict.fromkeys(conteudo))
         print(f"  {caixa['name']}: {len(conteudo)} itens ({por_raridade})")
+
+    if sem_preco_real:
+        # Aviso bem visível: o catálogo foi importado, mas os preços NÃO são reais.
+        print("\n" + "!" * 70)
+        print("ATENÇÃO: nenhum preço real foi obtido nesta execução.")
+        print("O catálogo foi importado, mas os itens novos estão com preço ESTIMADO.")
+        print("O motivo está na linha 'Sem preços reais' acima.")
+        print("!" * 70)
+        return 2
     print("\nPronto!")
     return 0
 

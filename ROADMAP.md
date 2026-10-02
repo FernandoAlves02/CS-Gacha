@@ -40,7 +40,7 @@
 
 **Como o código das Fases 2 e 3 foi validado antes de chegar até você:**
 
-- **58 testes automáticos** (regras, sorteio, controllers, importador e login) passando.
+- **61 testes automáticos** (regras, sorteio, controllers, importador e login) passando.
 - **Simulação de 200.000 aberturas:** cada raridade ficou a menos de 0,07 ponto percentual da chance oficial, e a distribuição de desgaste saiu em 3/24/33/24/16%.
 - **Fluxo completo dos DAOs** rodado num banco de conferência gerado a partir do `schema.sql`: comprar, abrir, vender, comprar skin, preço que mudou, saldo insuficiente, inventário em 1.000, skin de outro jogador, rollback sem consumir a caixa e conexões sempre fechadas. 45 de 45 verificações passaram.
 - **Importador** rodado de ponta a ponta com respostas de API simuladas (30 de 30), incluindo uma execução com a API de preços fora do ar.
@@ -333,7 +333,8 @@ select source, count(*) from skin_prices group by source;
 -- 4) histórico gravado nesta execução
 select count(*) from price_history;
 ```
-- [ ] 6 caixas, todas com itens e `price_source = skinport`.
+- [ ] A saída do importador **não** tem a linha `! Sem preços reais nesta execução` nem o aviso `ATENÇÃO` no final. Se tiver, **pare aqui** e me mande a linha inteira: ela traz o código e a resposta da API.
+- [ ] 6 caixas, todas com itens e `price_source = skinport` (preço da caixa **diferente** de 5,00, que é o valor estimado).
 - [ ] A consulta 2 mostra as 5 raridades (ou menos, se a caixa não tiver alguma).
 - [ ] A consulta 3 mostra principalmente `skinport`.
 - [ ] A pasta `app/assets/items` ficou cheia de imagens `.png`.
@@ -361,7 +362,9 @@ git push
 python -m unittest app.unit_tests.test_user_flow app.unit_tests.test_gacha_rules app.unit_tests.test_gacha_controllers app.unit_tests.test_sync_market
 ```
 **Validação**
-- [ ] Termina com `Ran 58 tests` e `OK`.
+- [ ] Termina com `Ran 61 tests` e `OK`, sem nenhum traceback no meio.
+
+> O teste `test_erro_inesperado_nao_derruba_a_tela` simula o banco caindo de propósito. Ele captura o log do erro com `assertLogs`, para o traceback não aparecer na saída como se fosse uma falha.
 
 ### T3.2 Autoteste no banco real (3 min)
 
@@ -374,6 +377,8 @@ O script cria um usuário temporário, compra uma caixa, abre, vende, compra uma
 **Validação**
 - [ ] Última linha: `TUDO CERTO: 31 verificações passaram.` (o número pode variar um pouco).
 - [ ] A tabela "esperado × obtido" mostra valores próximos. **Guarde um print para a apresentação.**
+- [ ] Os preços do autoteste são reais: a caixa usada **não** custa R$ 5,00 e a skin do drop não custa exatamente o valor estimado (ex.: Mil-Spec FN = R$ 1,28; Special Item BS = R$ 1.125,00). Se custarem, os preços estão estimados: volte à T2.4.
+- [ ] A linha "Desgaste" não precisa bater com 3/24/33/24/16%: cada skin tem float mínimo e máximo próprios, e o valor é encaixado nesse intervalo. Uma skin de 0,00 a 0,50, por exemplo, nunca sai Battle-Scarred.
 - [ ] `select username from users;` mostra só as contas reais (o `autoteste_...` sumiu).
 
 **Se der erro:** mande a saída **inteira**. A lista "FALHARAM" diz exatamente qual regra quebrou.
@@ -490,7 +495,7 @@ Filtros do inventário: sugiro trocar as 7 categorias atuais por **TUDO / CAIXAS
 
 | Dia | Foco | Entregável |
 |---|---|---|
-| **Sex 02/10** | Instalação no PC do professor (versão da Fase 1) · integrar Fases 2 e 3 (seções 7 e 8) | Banco v2 com dados reais; 58 testes OK; autoteste OK; login novo |
+| **Sex 02/10** | Instalação no PC do professor (versão da Fase 1) · integrar Fases 2 e 3 (seções 7 e 8) | Banco v2 com dados reais; 61 testes OK; autoteste OK; login novo |
 | **Sáb 03/10** | Fase 4 (Mercado) | Comprar caixa e skin pela tela |
 | **Dom 04/10** | Fase 5 (Inventário, abertura, venda) | **MVP completo** |
 | **Seg–Qua 05–07/10** | Ajustes, *Should*, Fase 6 (slides, roteiro, vídeo) | Apresentação pronta |

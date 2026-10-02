@@ -145,8 +145,13 @@ class MarketControllerTests(unittest.TestCase):
         self.assertEqual(self.user.balance, Decimal("500.00"))
 
     def test_erro_inesperado_nao_derruba_a_tela(self):
+        # Simula o banco caindo no meio da compra. O controller precisa:
+        # 1) registrar o erro no log (assertLogs confere e "engole" o traceback,
+        #    para ele não aparecer na saída dos testes como se fosse uma falha);
+        # 2) mostrar uma mensagem amigável em vez de fechar o jogo.
         c = self._controller(inv=FakeInventoryDAO(erro=RuntimeError("banco caiu")))
-        self.assertFalse(c.buy_case(Collection(1, "Caixa Teste", "10.00")))
+        with self.assertLogs("app.controller.market_controller", level="ERROR"):
+            self.assertFalse(c.buy_case(Collection(1, "Caixa Teste", "10.00")))
         self.assertFalse(self.view.last[1])
 
     def test_compra_de_skin_gera_float_dentro_do_desgaste(self):

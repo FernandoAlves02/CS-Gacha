@@ -6,10 +6,13 @@ e da Skinport (/v1/items e /v1/sales/history).
 Rodar da raiz do projeto:
     python -m unittest app.unit_tests.test_sync_market -v
 """
+import io
 import unittest
+import urllib.error
 from decimal import Decimal
+from email.message import Message
 
-from tools.sync_market import build_catalog, index_prices, index_skins, only_cases, select_cases
+from tools.sync_market import _describe_error, build_catalog, index_prices, index_skins, only_cases, select_cases
 
 IMG = "https://community.akamai.steamstatic.com/economy/image/abc"
 
@@ -138,6 +141,23 @@ class PriceTests(unittest.TestCase):
 
     def test_entradas_vazias(self):
         self.assertEqual(index_prices(None, None), {})
+
+
+class ErrorMessageTests(unittest.TestCase):
+
+    def _http_error(self, code, body):
+        return urllib.error.HTTPError("https://api.skinport.com/v1/items", code, "Forbidden", Message(), io.BytesIO(body))
+
+    def test_erro_http_mostra_codigo_e_resposta_da_api(self):
+        texto = _describe_error(self._http_error(403, b'{"errors":[{"id":"forbidden","message":"Access denied"}]}'))
+        self.assertIn("HTTP 403", texto)
+        self.assertIn("Access denied", texto)
+
+    def test_limite_de_chamadas(self):
+        self.assertIn("aguarde 5 minutos", _describe_error(self._http_error(429, b"")))
+
+    def test_erro_sem_http(self):
+        self.assertIn("TimeoutError", _describe_error(TimeoutError("timed out")))
 
 
 if __name__ == "__main__":

@@ -31,6 +31,10 @@ class User:
         username = (username or "").strip()
         if not 3 <= len(username) <= 50:
             raise ValueError("O nome de usuário deve ter entre 3 e 50 caracteres.")
+        # O login aceita usuário OU e-mail e decide pelo "@". Por isso o nome
+        # de usuário não pode ter "@" (senão poderia ser confundido com um e-mail).
+        if "@" in username:
+            raise ValueError("O nome de usuário não pode conter @.")
         return username
 
     @staticmethod

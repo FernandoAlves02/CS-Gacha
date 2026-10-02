@@ -160,6 +160,39 @@ class User_DAO(DAO):
         finally:
             self.disconnect(cursor, connection)
 
+    def get_by_username(self, username):
+        # Usado no login pelo nome de usuário (a tela pede "Usuário").
+        # Traz a senha (hash) porque o login precisa conferir.
+
+        connection, cursor = self.connect()
+
+        try:
+
+            sql = """
+                    SELECT
+                        id,
+                        username,
+                        password,
+                        email,
+                        balance
+                    FROM
+                        users
+                    WHERE
+                        username = %s
+                  """
+
+            cursor.execute(sql, (username,))
+
+            data = cursor.fetchone()
+
+            if data is None:
+                return None
+
+            return User(data[0], data[1], data[2], data[3], data[4])
+
+        finally:
+            self.disconnect(cursor, connection)
+
     def update(self, user):
         # Atualiza nome e e-mail. A senha só é gravada quando o objeto
         # traz uma senha nova (user.password diferente de None); assim um

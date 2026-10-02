@@ -13,14 +13,19 @@ class Login_Controller:
 
     def auth(self):
         try:
-            email, password = self.view.read_login_data()
-            email = (email or "").strip().lower()
+            login, password = self.view.read_login_data()
+            login = (login or "").strip()
 
-            if not email or not password:
-                self.view.show_message("Informe e-mail e senha.", False)
+            if not login or not password:
+                self.view.show_message("Informe usuário e senha.", False)
                 return
 
-            user = self.user_dao.get_by_email(email)
+            # O campo aceita nome de usuário OU e-mail:
+            # tem "@" -> procura pelo e-mail; não tem -> procura pelo usuário.
+            if "@" in login:
+                user = self.user_dao.get_by_email(login.lower())
+            else:
+                user = self.user_dao.get_by_username(login)
 
         except Exception:
             logger.exception("Falha ao autenticar")
@@ -30,9 +35,10 @@ class Login_Controller:
             )
             return
 
-        # Mesma mensagem para "e-mail não existe" e "senha errada".
+        # Mesma mensagem para "usuário não existe" e "senha errada"
+        # (não revela quais contas existem).
         if user is None or not Password_Utils.check_password(password, user.password):
-            self.view.show_message("E-mail ou senha inválidos.", False)
+            self.view.show_message("Usuário ou senha inválidos.", False)
             return
 
         # O hash só serve para conferir a senha; não fica na sessão.

@@ -7,4 +7,7 @@ __pycache__/
 *.pyc
 /Assets/
 .Assets/
+# arquivo com mais de 100 MB: o GitHub recusa (distribuir por pendrive/Drive)
 app/assets/maps/de_mirage_d.glb
+# cópia local das respostas da API (gerada pelo importador)
+tools/cache/

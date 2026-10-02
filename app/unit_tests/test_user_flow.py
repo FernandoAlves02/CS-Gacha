@@ -50,6 +50,12 @@ class FakeDAO:
         user = self.users.get(email)
         return copy.copy(user) if user else None
 
+    def get_by_username(self, username):
+        for user in self.users.values():
+            if user.username == username:
+                return copy.copy(user)
+        return None
+
     def update(self, user):
         self.users[user.email] = copy.copy(user)
         return True
@@ -97,6 +103,8 @@ class UserModelTests(unittest.TestCase):
                 User.validate_email(invalido)
         with self.assertRaises(ValueError):
             User.validate_username("ab")
+        with self.assertRaises(ValueError):
+            User.validate_username("ana@x")      # "@" é reservado para o login por e-mail
         with self.assertRaises(ValueError):
             User.validate_password("12345")
 
@@ -166,27 +174,34 @@ class LoginControllerTests(unittest.TestCase):
         ).save()
         self.logados = []
 
-    def _login(self, email, senha):
-        view = FakeView(login_data=(email, senha))
+    def _login(self, login, senha):
+        view = FakeView(login_data=(login, senha))
         Login_Controller(self.dao, view, self.logados.append).auth()
         return view
 
-    def test_login_ok_entrega_usuario_sem_hash(self):
+    def test_login_por_email_entrega_usuario_sem_hash(self):
         self._login("  ANA@x.com ", "segredo123")
         self.assertEqual(len(self.logados), 1)
         self.assertEqual(self.logados[0].username, "ana")
         self.assertIsNone(self.logados[0].password)
 
-    def test_senha_errada_ou_email_inexistente_dao_mesma_mensagem(self):
+    def test_login_por_nome_de_usuario(self):
+        self._login(" ana ", "segredo123")
+        self.assertEqual(len(self.logados), 1)
+        self.assertEqual(self.logados[0].email, "ana@x.com")
+
+    def test_senha_errada_ou_usuario_inexistente_dao_mesma_mensagem(self):
         v1 = self._login("ana@x.com", "errada")
         v2 = self._login("naoexiste@x.com", "segredo123")
+        v3 = self._login("naoexiste", "segredo123")
         self.assertEqual(self.logados, [])
         self.assertEqual(v1.messages[-1], v2.messages[-1])
-        self.assertEqual(v1.messages[-1], ("E-mail ou senha inválidos.", False))
+        self.assertEqual(v2.messages[-1], v3.messages[-1])
+        self.assertEqual(v1.messages[-1], ("Usuário ou senha inválidos.", False))
 
     def test_campos_vazios(self):
         view = self._login("", "")
-        self.assertEqual(view.messages[-1], ("Informe e-mail e senha.", False))
+        self.assertEqual(view.messages[-1], ("Informe usuário e senha.", False))
         self.assertEqual(self.logados, [])
 
 

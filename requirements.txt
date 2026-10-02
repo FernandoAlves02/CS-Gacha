@@ -1,7 +1,8 @@
-# Dependências mínimas para rodar o CS Gacha (instale com: pip install -r requirements.txt)
-panda3d
-mysql-connector-python
-python-dotenv
+# Dependências do CS Gacha (instale com: pip install -r requirements.txt)
+panda3d                  # motor gráfico (janela, interface, 3D)
+mysql-connector-python   # conexão com o MySQL/MariaDB do XAMPP
+python-dotenv            # lê o arquivo .env com os dados do banco
+brotli                   # usado SÓ pelo importador (tools/sync_market.py): a API de preços exige compressão Brotli
 
 # Cenário 3D opcional (mapa + personagem em .glb). Sem elas o jogo roda normalmente,
 # só que sem o cenário. Para ativar:  pip install panda3d-gltf panda3d-simplepbr

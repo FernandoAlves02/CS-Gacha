@@ -3,6 +3,16 @@ import sys
 from pathlib import Path
 
 from direct.showbase.ShowBase import ShowBase
+from panda3d.core import loadPrcFileData
+
+# Configurações da janela. Precisam vir ANTES de criar o ShowBase.
+loadPrcFileData("", "\n".join([
+    "window-title CS Gacha",
+    "win-size 1280 720",            # 16:9, mesma proporção da arte da tela de login
+    # Sem isto o Panda3D reduz as imagens para potência de 2 (ex.: 1671 px -> 1024 px)
+    # e a interface fica borrada.
+    "textures-power-2 none",
+]))
 
 # Garante que a raiz do projeto está no sys.path
 PROJECT_ROOT = Path(__file__).resolve().parent

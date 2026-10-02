@@ -1,0 +1,171 @@
+import logging
+import math
+import random
+
+from app.core.drop_service import drop_table, float_for_wear
+from app.core.game_rules import INVENTORY_LIMIT, format_money
+from app.models.skin_instance import Skin_Instance
+
+logger = logging.getLogger(__name__)
+
+# Quantos anúncios de skin por página no mercado.
+PAGE_SIZE = 24
+
+
+class Market_Controller:
+    """Regras da tela do MERCADO (comprar caixas e skins avulsas).
+
+    Contrato com a tela (view): ela precisa ter
+        show_message(message, success=True)
+    Os métodos de listagem DEVOLVEM os dados; a tela chama e desenha.
+
+    "user" é o usuário logado (view_manager.usuario_logado). O saldo dele é
+    atualizado aqui depois de cada compra, para o header mostrar o valor novo.
+
+    Fluxo de compra pedido na documentação:
+        1. can_afford(preço)       -> preço em verde (True) ou vermelho (False)
+        2. check_purchase(preço)   -> None = pode comprar | texto = motivo do bloqueio
+        3. a tela pergunta "Deseja comprar por R$ X?"
+        4. buy_case(...) / buy_skin(...) -> o DAO confere TUDO de novo dentro da transação
+    """
+
+    def __init__(self, collection_dao, skin_catalog_dao, inventory_dao, view, user, rng=random):
+        self.collection_dao = collection_dao
+        self.skin_catalog_dao = skin_catalog_dao
+        self.inventory_dao = inventory_dao
+        self.view = view
+        self.user = user
+        self.rng = rng          # nos testes passamos random.Random(semente)
+
+    # ----------------------------------------------------------
+    # LISTAGENS
+    # ----------------------------------------------------------
+
+    def list_cases(self):
+        """Caixas à venda (lista de Collection)."""
+        try:
+            return self.collection_dao.get_all()
+        except Exception:
+            logger.exception("Falha ao listar caixas")
+            self.view.show_message("Não foi possível carregar as caixas.", False)
+            return []
+
+    def case_contents(self, collection_id):
+        """O que pode sair da caixa e a chance de cada item: lista de (Skin_Catalog, chance).
+        A chance é um Decimal entre 0 e 1 (multiplique por 100 para mostrar em %)."""
+        try:
+            items = self.collection_dao.get_items(collection_id)
+            probabilities = {item.rarity_id: item.rarity.probability for item in items}
+            return drop_table(items, probabilities)
+        except ValueError as e:
+            self.view.show_message(str(e), False)
+        except Exception:
+            logger.exception("Falha ao carregar o conteúdo da caixa")
+            self.view.show_message("Não foi possível carregar o conteúdo da caixa.", False)
+        return []
+
+    def list_skins(self, search="", page=0, rarity_id=None):
+        """Skins à venda, paginadas. Devolve (lista de (Skin_Catalog, Market_Price), total de páginas)."""
+        try:
+            total = self.skin_catalog_dao.count_market_listings(search, rarity_id)
+            rows = self.skin_catalog_dao.get_market_listings(
+                search, PAGE_SIZE, max(page, 0) * PAGE_SIZE, rarity_id
+            )
+            return rows, max(1, math.ceil(total / PAGE_SIZE))
+        except Exception:
+            logger.exception("Falha ao listar skins")
+            self.view.show_message("Não foi possível carregar o mercado de skins.", False)
+            return [], 1
+
+    def skin_prices(self, skin_catalog_id):
+        """Preço da skin em cada desgaste (lista de Market_Price)."""
+        try:
+            return self.skin_catalog_dao.get_prices(skin_catalog_id)
+        except Exception:
+            logger.exception("Falha ao carregar preços")
+            self.view.show_message("Não foi possível carregar os preços.", False)
+            return []
+
+    def price_history(self, skin_catalog_id=None, wear=None, collection_id=None, limit=30):
+        """Histórico (data, preço) de uma skin+desgaste OU de uma caixa (para gráfico)."""
+        try:
+            if collection_id is not None:
+                return self.collection_dao.get_price_history(collection_id, limit)
+            return self.skin_catalog_dao.get_price_history(skin_catalog_id, wear, limit)
+        except Exception:
+            logger.exception("Falha ao carregar histórico")
+            return []
+
+    # ----------------------------------------------------------
+    # CHECAGENS ANTES DA COMPRA
+    # ----------------------------------------------------------
+
+    def can_afford(self, price):
+        """True = mostrar o preço em VERDE; False = em VERMELHO."""
+        return self.user.balance >= price
+
+    def check_purchase(self, price):
+        """Checagem antes de pedir confirmação. Devolve None se pode comprar,
+        ou a mensagem do motivo ("Saldo insuficiente." / "Inventário cheio!")."""
+        if not self.can_afford(price):
+            return "Saldo insuficiente."
+        try:
+            if self.inventory_dao.count_items(self.user.id) + 1 > INVENTORY_LIMIT:
+                return "Inventário cheio!"
+        except Exception:
+            logger.exception("Falha ao contar o inventário")
+            return "Não foi possível verificar o inventário."
+        return None
+
+    # ----------------------------------------------------------
+    # COMPRAS
+    # ----------------------------------------------------------
+
+    def buy_case(self, collection):
+        """Compra 1 caixa (objeto Collection mostrado na tela). Devolve True/False."""
+        try:
+            new_balance = self.inventory_dao.buy_case(
+                self.user.id, collection.id, expected_price=collection.price
+            )
+
+        except ValueError as e:
+            self.view.show_message(str(e), False)
+            return False
+
+        except Exception:
+            logger.exception("Falha ao comprar caixa")
+            self.view.show_message("Não foi possível concluir a compra.", False)
+            return False
+
+        self.user.balance = new_balance
+        self.view.show_message(
+            f"{collection.name} comprada! Saldo: {format_money(new_balance)}"
+        )
+        return True
+
+    def buy_skin(self, skin, market_price):
+        """Compra uma skin avulsa no desgaste escolhido.
+
+        skin: Skin_Catalog | market_price: Market_Price (o anúncio clicado).
+        O float é sorteado DENTRO da faixa do desgaste (ex.: Field-Tested 0.15-0.38).
+        Devolve o Skin_Instance criado, ou None se não deu certo.
+        """
+        try:
+            float_value = float_for_wear(skin.min_float, skin.max_float, market_price.wear, self.rng)
+            new_id, price, new_balance = self.inventory_dao.buy_skin(
+                self.user.id, skin.id, market_price.wear, float_value,
+                expected_price=market_price.price
+            )
+
+        except ValueError as e:
+            self.view.show_message(str(e), False)
+            return None
+
+        except Exception:
+            logger.exception("Falha ao comprar skin")
+            self.view.show_message("Não foi possível concluir a compra.", False)
+            return None
+
+        self.user.balance = new_balance
+        self.view.show_message(f"{skin.name} comprada! Saldo: {format_money(new_balance)}")
+        return Skin_Instance(new_id, self.user.id, skin.id, float_value, price, skin=skin)

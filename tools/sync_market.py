@@ -4,27 +4,33 @@ De onde vêm os dados
 --------------------
 1. CATÁLOGO (caixas, conteúdo de cada caixa, raridade, float mínimo/máximo,
    imagens): CSGO-API do ByMykel (arquivos JSON públicos no GitHub, sem chave).
-2. PREÇOS em reais + médias de venda de 7 e 30 dias: API pública da Skinport
-   (sem chave, limite de 8 chamadas a cada 5 minutos; usamos 2 por execução).
-   A Skinport EXIGE compressão Brotli, por isso a biblioteca "brotli".
+2. PREÇOS em reais: API pública de preços do MERCADO DA STEAM (priceoverview),
+   sem chave, já em R$. É o preço oficial do mercado do CS.
+   A Steam limita as consultas (cerca de 20 por minuto) e responde UM item por
+   vez, por isso a atualização completa demora (~1 h para as 6 caixas padrão).
+   O script consulta primeiro o que importa mais (caixas, depois skins comuns),
+   salva o progresso a cada 10 itens e pode ser interrompido com Ctrl+C e
+   continuado depois: na próxima execução ele começa pelo que ainda falta.
 
 O jogo NUNCA acessa a internet: ele só lê o banco. Este script é rodado
 antes (no seu PC e no do professor) para preencher/atualizar o banco.
-Cada vez que roda, os preços mudam conforme o mercado real e uma linha nova
-vai para price_history (o histórico de preços).
+Cada preço novo também vai para price_history (o histórico de preços).
 
 Como usar (na raiz do projeto, com o .venv ativado)
 -----------------------------------------------------
-    python tools/sync_market.py                 importa as caixas da lista CAIXAS_PADRAO
+    python tools/sync_market.py                 catálogo das CAIXAS_PADRAO + preços
     python tools/sync_market.py --listar        mostra todas as caixas disponíveis na API
     python tools/sync_market.py --caixas "Chroma Case" "Fracture Case"
-    python tools/sync_market.py --todas         importa TODAS as caixas (demora mais)
+    python tools/sync_market.py --todas         importa TODAS as caixas (demora muito mais)
     python tools/sync_market.py --imagens       também baixa as imagens (app/assets/items)
-    python tools/sync_market.py --sem-precos    só catálogo (preços estimados)
+    python tools/sync_market.py --so-precos     só atualiza preços (não baixa o catálogo)
+    python tools/sync_market.py --limite 100    consulta no máximo 100 preços nesta execução
+    python tools/sync_market.py --so-precos --continuo   repete sem parar (histórico para o gráfico)
+    python tools/sync_market.py --sem-precos    só catálogo (itens novos com preço estimado)
 
 Pode rodar quantas vezes quiser: ele atualiza o que já existe (não duplica).
-Se a internet ou a API falhar, usa a última cópia salva em tools/cache e,
-para itens sem preço, um preço estimado (game_rules.estimated_price).
+Enquanto um item não tem preço real, ele usa um preço estimado
+(game_rules.estimated_price), então o jogo sempre funciona.
 """
 import argparse
 import difflib
@@ -33,9 +39,10 @@ import json
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 # Permite rodar "python tools/sync_market.py" a partir da raiz do projeto.
@@ -46,15 +53,22 @@ if str(PROJECT_ROOT) not in sys.path:
 from app.core import game_rules as rules                              # noqa: E402
 from app.core.paths import ITEM_IMAGES_DIR, TOOLS_CACHE_DIR, item_image_path  # noqa: E402
 
-try:
-    import brotli          # pip install brotli (só este script usa)
-except ImportError:
-    brotli = None
-
 CATALOG_URL = "https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en/{arquivo}"
-SKINPORT_ITEMS_URL = "https://api.skinport.com/v1/items?app_id=730&currency=BRL&tradable=0"
-SKINPORT_HISTORY_URL = "https://api.skinport.com/v1/sales/history?app_id=730&currency=BRL"
+# currency=7 -> Real brasileiro (R$) | appid=730 -> Counter-Strike
+STEAM_PRICE_URL = "https://steamcommunity.com/market/priceoverview/?appid=730&currency=7&market_hash_name={nome}"
 USER_AGENT = "CSGacha/1.0 (projeto integrador SENAC)"
+
+STEAM_INTERVALO = 3.2        # segundos entre consultas (a Steam aceita ~20 por minuto)
+STEAM_PAUSA_LIMITE = 65      # segundos de pausa quando a Steam responde "muitas consultas" (429)
+STEAM_MAX_PAUSAS = 3         # pausas seguidas antes de parar (o progresso fica salvo)
+STEAM_MAX_FALHAS = 5         # erros de rede seguidos antes de parar (provavelmente sem internet)
+SALVAR_A_CADA = 10           # commit no banco a cada N preços
+
+# Modo contínuo (--continuo): passa por todos os itens, espera e começa de novo.
+# Cada passada grava um ponto novo no histórico de cada item (para o gráfico).
+PAUSA_ENTRE_PASSADAS = 5 * 60    # segundos entre uma passada e a próxima
+PAUSA_APOS_LIMITE = 15 * 60      # se a Steam limitou, espera mais antes de continuar
+PAUSA_APOS_REDE = 5 * 60         # se a internet caiu, espera e tenta de novo
 
 # Caixas importadas quando nenhuma é informada. Troque à vontade
 # (use --listar para ver os nomes exatos).
@@ -68,11 +82,15 @@ CAIXAS_PADRAO = [
 ]
 
 
+class SteamLimite(Exception):
+    """A Steam respondeu 429: muitas consultas seguidas, precisa esperar."""
+
+
 # ======================================================================
-# 1. DOWNLOAD (com cópia local em tools/cache)
+# 1. DOWNLOAD DO CATÁLOGO (com cópia local em tools/cache)
 # ======================================================================
 
-def download(url, cache_name, needs_brotli=False, timeout=120):
+def download(url, cache_name, timeout=120):
     """Baixa um JSON. Se falhar, usa a última cópia salva em tools/cache.
 
     Devolve (dados, origem) onde origem é "internet" ou "cache".
@@ -80,21 +98,15 @@ def download(url, cache_name, needs_brotli=False, timeout=120):
     """
     cache_file = TOOLS_CACHE_DIR / cache_name
     try:
-        if needs_brotli and brotli is None:
-            raise RuntimeError("biblioteca brotli não instalada (pip install brotli)")
-
         request = urllib.request.Request(url, headers={
             "User-Agent": USER_AGENT,
-            "Accept-Encoding": "br" if needs_brotli else "gzip",
+            "Accept-Encoding": "gzip",
             "Accept": "application/json",
         })
         with urllib.request.urlopen(request, timeout=timeout) as response:
             raw = response.read()
             encoding = (response.headers.get("Content-Encoding") or "").lower()
-
-        if encoding == "br":
-            raw = brotli.decompress(raw)
-        elif encoding == "gzip":
+        if encoding == "gzip":
             raw = gzip.decompress(raw)
 
         data = json.loads(raw.decode("utf-8"))
@@ -102,7 +114,7 @@ def download(url, cache_name, needs_brotli=False, timeout=120):
         cache_file.write_text(json.dumps(data), encoding="utf-8")
         return data, "internet"
 
-    except Exception as error:   # sem internet, API fora do ar, JSON inválido, erro do brotli...
+    except Exception as error:   # sem internet, site fora do ar, JSON inválido...
         motivo = _describe_error(error)
         if cache_file.exists():
             data_cache = datetime.fromtimestamp(cache_file.stat().st_mtime).strftime("%d/%m %H:%M")
@@ -112,17 +124,12 @@ def download(url, cache_name, needs_brotli=False, timeout=120):
 
 
 def _describe_error(error):
-    """Mensagem curta e COMPLETA do erro, para sabermos exatamente o que a API respondeu."""
+    """Mensagem curta e COMPLETA do erro, para sabermos exatamente o que o site respondeu."""
     if isinstance(error, urllib.error.HTTPError):
-        if error.code == 429:
-            return "HTTP 429: limite de chamadas da API; aguarde 5 minutos"
         detalhe = ""
         try:   # o corpo da resposta de erro costuma dizer o motivo
             corpo = error.read()
-            codificacao = (error.headers.get("Content-Encoding") or "").lower()
-            if codificacao == "br" and brotli is not None:
-                corpo = brotli.decompress(corpo)
-            elif codificacao == "gzip":
+            if (error.headers.get("Content-Encoding") or "").lower() == "gzip":
                 corpo = gzip.decompress(corpo)
             detalhe = " ".join(corpo.decode("utf-8", "replace").split())[:300]
         except Exception:
@@ -245,41 +252,90 @@ def _add_skin(skins, entry, rarity_name, skins_by_id, skins_by_name, avisos):
 
 
 # ======================================================================
-# 3. PREÇOS (função pura)
+# 3. PREÇOS DA STEAM (funções puras + consulta)
 # ======================================================================
 
-def index_prices(items_json, history_json):
-    """Junta /v1/items e /v1/sales/history da Skinport em
-    {market_hash_name: (preço atual, média 7 dias, média 30 dias)}.
+def parse_brl(texto):
+    """Converte o preço da Steam em Decimal. Ex.: "R$ 1.234,56" -> Decimal("1234.56").
+    Devolve None se não houver número (ex.: None, "", "--")."""
+    if not texto:
+        return None
+    numeros = "".join(c for c in str(texto) if c.isdigit() or c in ",.")
+    if not numeros:
+        return None
+    numeros = numeros.replace(".", "").replace(",", ".")    # padrão brasileiro
+    try:
+        valor = Decimal(numeros)
+    except InvalidOperation:
+        return None
+    return rules.to_money(valor) if valor > 0 else None
 
-    Preço atual = preço sugerido de mercado; se não houver, a mediana das
-    vendas dos últimos 7 dias; depois a mediana e o menor preço dos anúncios.
+
+def pick_steam_price(data):
+    """Escolhe o preço de mercado da resposta da Steam.
+
+    median_price = mediana das vendas das últimas 24 h (mais estável);
+    se não houver vendas no dia, usa lowest_price (o anúncio mais barato agora).
     """
-    history = {h.get("market_hash_name"): h for h in history_json or [] if h.get("market_hash_name")}
-    prices = {}
-    for item in items_json or []:
-        name = item.get("market_hash_name")
-        if not name:
-            continue
-        sales = history.get(name, {})
-        last7 = sales.get("last_7_days") or {}
-        last30 = sales.get("last_30_days") or {}
-        price = _first_positive(
-            item.get("suggested_price"), last7.get("median"), item.get("median_price"), item.get("min_price")
-        )
-        if price is None:
-            continue
-        prices[name] = (price, _first_positive(last7.get("avg")), _first_positive(last30.get("avg")))
-    return prices
+    if not data or not data.get("success"):
+        return None
+    return parse_brl(data.get("median_price")) or parse_brl(data.get("lowest_price"))
 
 
-def _first_positive(*values):
-    for value in values:
-        if value is not None:
-            money = rules.to_money(value)
-            if money > 0:
-                return money
-    return None
+def fetch_steam_price(market_hash_name, timeout=30):
+    """Consulta UM item no mercado da Steam.
+
+    Devolve o JSON da Steam (dict). Item inexistente ou sem anúncio devolve
+    {"success": False}. Lança SteamLimite (429) ou RuntimeError (rede).
+    """
+    url = STEAM_PRICE_URL.format(nome=urllib.parse.quote(market_hash_name, safe=""))
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return json.loads(response.read().decode("utf-8") or "null") or {"success": False}
+    except urllib.error.HTTPError as error:
+        if error.code == 429:
+            raise SteamLimite() from error
+        if error.code in (400, 404, 500):
+            return {"success": False}      # a Steam responde 500 para nome que não existe
+        raise RuntimeError(_describe_error(error)) from error
+    except Exception as error:             # sem internet, tempo esgotado, JSON inválido
+        raise RuntimeError(_describe_error(error)) from error
+
+
+def plan_price_updates(case_rows, skin_rows, existing_skin_prices):
+    """Ordem das consultas (função pura, testada em test_sync_market).
+
+    case_rows:  [(id, market_name, price_source, price_updated_at)]
+    skin_rows:  [(id, market_name, min_float, max_float, rarity_id)]
+    existing_skin_prices: {(skin_id, wear): (source, updated_at)}
+
+    Devolve uma lista de tarefas (tipo, id, desgaste, nome_no_mercado):
+      1º itens que AINDA NÃO têm preço real: caixas, depois skins da raridade
+         mais comum para a mais rara (são as que mais saem nas aberturas);
+      2º itens que já têm preço real, do mais desatualizado para o mais novo.
+    """
+    pendentes, atualizar = [], []
+
+    for case_id, market_name, source, updated_at in case_rows:
+        tarefa = ("caixa", case_id, None, market_name)
+        if source == rules.SOURCE_API:
+            atualizar.append((updated_at, tarefa))
+        else:
+            pendentes.append(tarefa)
+
+    ordenadas = sorted(skin_rows, key=lambda r: (r[4], r[1]))
+    for skin_id, market_name, min_float, max_float, _rarity in ordenadas:
+        for wear in rules.available_wears(min_float, max_float):
+            tarefa = ("skin", skin_id, wear, rules.market_hash_name(market_name, wear))
+            source, updated_at = existing_skin_prices.get((skin_id, wear), (None, None))
+            if source == rules.SOURCE_API:
+                atualizar.append((updated_at, tarefa))
+            else:
+                pendentes.append(tarefa)
+
+    atualizar.sort(key=lambda par: str(par[0] or ""))
+    return pendentes + [tarefa for _data, tarefa in atualizar]
 
 
 # ======================================================================
@@ -298,7 +354,7 @@ def save_catalog(database, caixas, skins, ligacoes):
             raise RuntimeError(f"Raridades ausentes no banco: {faltando}. Rode o seed_base.sql.")
 
         for caixa in caixas:
-            # caixa nova entra com preço estimado; o preço real vem em update_prices
+            # caixa nova entra com preço estimado; o preço real vem da Steam depois
             cursor.execute(
                 """
                 INSERT INTO collections
@@ -354,47 +410,130 @@ def save_catalog(database, caixas, skins, ligacoes):
         database.disconnect(cursor, connection)
 
 
-def update_prices(database, prices):
-    """Atualiza os preços de TODAS as skins e caixas que estão no banco.
-
-    - Item com preço na API: grava o preço real e uma linha no histórico.
-    - Item sem preço na API e que ainda não tem preço: grava o estimado.
-    - Item sem preço na API que já tinha preço: mantém o antigo (não troca
-      um preço real por um estimado só porque a API falhou desta vez).
-    Devolve um dicionário com as contagens.
-    """
+def fill_missing_estimates(database):
+    """Garante que TODA skin, em todo desgaste possível, tenha um preço
+    (estimado), para o jogo funcionar antes de a Steam terminar. Rápido: não usa internet."""
     agora = datetime.now().replace(microsecond=0)
-    total = {"reais": 0, "estimados": 0, "mantidos": 0, "caixas_reais": 0}
-
     connection = database.connect()
     cursor = connection.cursor(buffered=True)
     try:
         cursor.execute("SELECT skin_catalog_id, wear FROM skin_prices")
-        ja_tem_preco = set(cursor.fetchall())
-
+        ja_tem = set(cursor.fetchall())
         cursor.execute(
             """
-            SELECT s.id, s.market_name, s.min_float, s.max_float, r.name
+            SELECT s.id, s.min_float, s.max_float, r.name
             FROM skins_catalog s
             JOIN rarities r ON r.id = s.rarity_id
             WHERE s.market_name IS NOT NULL
             """
         )
-        for skin_id, market_name, min_float, max_float, rarity_name in cursor.fetchall():
+        novos = 0
+        for skin_id, min_float, max_float, rarity_name in cursor.fetchall():
             for wear in rules.available_wears(min_float, max_float):
-                found = prices.get(rules.market_hash_name(market_name, wear))
-                if found:
-                    price, avg_7d, avg_30d = found
-                    source = rules.SOURCE_API
-                    total["reais"] += 1
-                elif (skin_id, wear) in ja_tem_preco:
-                    total["mantidos"] += 1
+                if (skin_id, wear) in ja_tem:
                     continue
-                else:
-                    price, avg_7d, avg_30d = rules.estimated_price(rarity_name, wear), None, None
-                    source = rules.SOURCE_ESTIMATED
-                    total["estimados"] += 1
+                cursor.execute(
+                    """
+                    INSERT INTO skin_prices (skin_catalog_id, wear, price, source, updated_at)
+                    VALUES (%s, %s, %s, %s, %s)
+                    """,
+                    (skin_id, wear, rules.estimated_price(rarity_name, wear), rules.SOURCE_ESTIMATED, agora)
+                )
+                novos += 1
+        connection.commit()
+        return novos
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        database.disconnect(cursor, connection)
 
+
+def load_price_plan(database):
+    """Lê do banco o que precisa de preço e devolve a lista ordenada de tarefas."""
+    connection = database.connect()
+    cursor = connection.cursor(buffered=True)
+    try:
+        cursor.execute(
+            "SELECT id, market_name, price_source, price_updated_at FROM collections WHERE market_name IS NOT NULL"
+        )
+        case_rows = cursor.fetchall()
+        cursor.execute(
+            "SELECT id, market_name, min_float, max_float, rarity_id FROM skins_catalog WHERE market_name IS NOT NULL"
+        )
+        skin_rows = cursor.fetchall()
+        cursor.execute("SELECT skin_catalog_id, wear, source, updated_at FROM skin_prices")
+        existing = {(sid, wear): (source, updated) for sid, wear, source, updated in cursor.fetchall()}
+    finally:
+        database.disconnect(cursor, connection)
+    return plan_price_updates(case_rows, skin_rows, existing)
+
+
+def update_prices_from_steam(database, tarefas, fetch=None, sleep=None):
+    """Consulta a Steam item por item e grava cada preço real (com histórico).
+
+    Salva a cada SALVAR_A_CADA itens: se a execução for interrompida (Ctrl+C,
+    queda de internet, limite da Steam), o que já foi consultado não se perde.
+    Devolve um dicionário com as contagens e o motivo da parada (se houver).
+    """
+    fetch = fetch or fetch_steam_price      # nos testes dá para trocar por uma Steam "de mentira"
+    sleep = sleep or time.sleep
+    total = {"reais": 0, "sem_anuncio": 0, "falhas": 0, "consultados": 0, "parada": None, "motivo": None}
+    connection = database.connect()
+    cursor = connection.cursor(buffered=True)
+    falhas_seguidas = 0
+    inicio = time.time()
+    try:
+        for numero, (tipo, item_id, wear, nome) in enumerate(tarefas, start=1):
+            # --- consulta (com pausas automáticas se a Steam pedir) ---
+            dados, pausas = None, 0
+            while True:
+                try:
+                    dados = fetch(nome)
+                    falhas_seguidas = 0
+                    break
+                except SteamLimite:
+                    pausas += 1
+                    if pausas > STEAM_MAX_PAUSAS:
+                        total["parada"] = "a Steam limitou as consultas; rode de novo daqui a uns 10 minutos"
+                        total["motivo"] = "limite"
+                        break
+                    print(f"  ... a Steam pediu uma pausa; aguardando {STEAM_PAUSA_LIMITE}s "
+                          f"({pausas}/{STEAM_MAX_PAUSAS})")
+                    connection.commit()
+                    sleep(STEAM_PAUSA_LIMITE)
+                except RuntimeError as error:
+                    falhas_seguidas += 1
+                    total["falhas"] += 1
+                    if falhas_seguidas >= STEAM_MAX_FALHAS:
+                        total["parada"] = f"{STEAM_MAX_FALHAS} erros de rede seguidos ({error})"
+                        total["motivo"] = "rede"
+                    break
+            if total["parada"]:
+                break
+            total["consultados"] += 1
+
+            # --- gravação ---
+            preco = pick_steam_price(dados)
+            agora = datetime.now().replace(microsecond=0)
+            if preco is None:
+                if dados is not None:
+                    total["sem_anuncio"] += 1      # fica com o preço que já tinha (estimado ou real)
+            elif tipo == "caixa":
+                cursor.execute(
+                    """
+                    UPDATE collections
+                    SET price_collection = %s, price_source = %s, price_updated_at = %s
+                    WHERE id = %s
+                    """,
+                    (preco, rules.SOURCE_API, agora, item_id)
+                )
+                cursor.execute(
+                    "INSERT INTO price_history (collection_id, price, source, captured_at) VALUES (%s, %s, %s, %s)",
+                    (item_id, preco, rules.SOURCE_API, agora)
+                )
+                total["reais"] += 1
+            else:
                 cursor.execute(
                     """
                     INSERT INTO skin_prices
@@ -402,52 +541,55 @@ def update_prices(database, prices):
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
                     ON DUPLICATE KEY UPDATE
                         price = VALUES(price),
-                        avg_7d = VALUES(avg_7d),
-                        avg_30d = VALUES(avg_30d),
                         source = VALUES(source),
                         updated_at = VALUES(updated_at)
                     """,
-                    (skin_id, wear, price, avg_7d, avg_30d, source, agora)
+                    (item_id, wear, preco, None, None, rules.SOURCE_API, agora)
                 )
-                if source == rules.SOURCE_API:
-                    cursor.execute(
-                        """
-                        INSERT INTO price_history (skin_catalog_id, wear, price, source, captured_at)
-                        VALUES (%s, %s, %s, %s, %s)
-                        """,
-                        (skin_id, wear, price, source, agora)
-                    )
+                cursor.execute(
+                    """
+                    INSERT INTO price_history (skin_catalog_id, wear, price, source, captured_at)
+                    VALUES (%s, %s, %s, %s, %s)
+                    """,
+                    (item_id, wear, preco, rules.SOURCE_API, agora)
+                )
+                total["reais"] += 1
 
-        cursor.execute("SELECT id, market_name FROM collections WHERE market_name IS NOT NULL")
-        for case_id, market_name in cursor.fetchall():
-            found = prices.get(market_name)
-            if not found:
-                continue
-            price = found[0]
-            cursor.execute(
-                """
-                UPDATE collections
-                SET price_collection = %s, price_source = %s, price_updated_at = %s
-                WHERE id = %s
-                """,
-                (price, rules.SOURCE_API, agora, case_id)
-            )
-            cursor.execute(
-                """
-                INSERT INTO price_history (collection_id, price, source, captured_at)
-                VALUES (%s, %s, %s, %s)
-                """,
-                (case_id, price, rules.SOURCE_API, agora)
-            )
-            total["caixas_reais"] += 1
+            if numero % SALVAR_A_CADA == 0 or numero == len(tarefas):
+                connection.commit()
+                restante = (time.time() - inicio) / numero * (len(tarefas) - numero) / 60
+                preco_txt = rules.format_money(preco) if preco else "sem anúncio"
+                print(f"  [{numero}/{len(tarefas)}] {nome}: {preco_txt}  (faltam ~{restante:.0f} min)")
+
+            if numero < len(tarefas):
+                sleep(STEAM_INTERVALO)
 
         connection.commit()
+        return total
+
+    except KeyboardInterrupt:
+        connection.commit()                 # salva o que já foi consultado
+        total["parada"] = "interrompido pelo usuário (Ctrl+C); o progresso foi salvo"
+        total["motivo"] = "ctrlc"
         return total
     except Exception:
         connection.rollback()
         raise
     finally:
         database.disconnect(cursor, connection)
+
+
+def wait_before_next_pass(total):
+    """Modo contínuo: quantos segundos esperar antes da próxima passada.
+    Devolve None quando é para encerrar (o usuário apertou Ctrl+C)."""
+    motivo = total.get("motivo")
+    if motivo == "ctrlc":
+        return None
+    if motivo == "limite":
+        return PAUSA_APOS_LIMITE
+    if motivo == "rede":
+        return PAUSA_APOS_REDE
+    return PAUSA_ENTRE_PASSADAS
 
 
 # ======================================================================
@@ -491,6 +633,51 @@ def download_images(database):
     return baixadas, puladas, falhas
 
 
+def _print_total(total):
+    print(
+        f"    {total['reais']} preços reais gravados | {total['sem_anuncio']} sem anúncio na Steam | "
+        f"{total['falhas']} falhas de rede"
+    )
+    if total["parada"]:
+        print(f"  ! Parou antes do fim: {total['parada']}.")
+
+
+def run_continuous(database, limite=None, sleep=None, max_passadas=None):
+    """--continuo: repete as passadas de preço até o usuário apertar Ctrl+C.
+
+    Cada passada consulta todos os itens (primeiro os sem preço real, depois
+    os mais desatualizados) e grava um ponto novo em price_history. Deixando
+    rodando um fim de semana, cada item ganha dezenas de pontos no histórico.
+    Se a Steam limitar ou a internet cair, ele espera e continua sozinho.
+    max_passadas existe só para os testes.
+    """
+    sleep = sleep or time.sleep
+    passada = 0
+    print("3/4 Modo contínuo: atualizando preços sem parar. Ctrl+C encerra (o progresso fica salvo).")
+    print("    Deixe o XAMPP ligado e o computador sem suspender (Configurações > Energia).")
+    while True:
+        passada += 1
+        tarefas = load_price_plan(database)
+        if limite:
+            tarefas = tarefas[:limite]
+        inicio = datetime.now().strftime("%d/%m %H:%M")
+        print(f"\n=== Passada {passada} ({inicio}): {len(tarefas)} preços, "
+              f"~{len(tarefas) * STEAM_INTERVALO / 60:.0f} min ===")
+        total = update_prices_from_steam(database, tarefas, sleep=sleep)
+        _print_total(total)
+
+        espera = wait_before_next_pass(total)
+        if espera is None or (max_passadas and passada >= max_passadas):
+            print(f"\nModo contínuo encerrado depois de {passada} passada(s).")
+            return passada
+        print(f"    Próxima passada em {espera // 60} min (Ctrl+C para encerrar).")
+        try:
+            sleep(espera)
+        except KeyboardInterrupt:
+            print(f"\nModo contínuo encerrado depois de {passada} passada(s).")
+            return passada
+
+
 # ======================================================================
 # 6. PROGRAMA PRINCIPAL
 # ======================================================================
@@ -506,68 +693,75 @@ def main(argv=None):
     parser.add_argument("--caixas", nargs="+", metavar="NOME", help="nomes das caixas a importar")
     parser.add_argument("--todas", action="store_true", help="importa todas as caixas da API")
     parser.add_argument("--imagens", action="store_true", help="baixa as imagens para app/assets/items")
-    parser.add_argument("--sem-precos", action="store_true", help="não consulta a Skinport (preços estimados)")
+    parser.add_argument("--sem-precos", action="store_true", help="não consulta a Steam (preços estimados)")
+    parser.add_argument("--so-precos", action="store_true", help="só atualiza preços (não baixa o catálogo)")
+    parser.add_argument("--limite", type=int, metavar="N", help="consulta no máximo N preços nesta execução")
+    parser.add_argument("--continuo", action="store_true",
+                        help="repete a consulta de preços sem parar (para montar o histórico); Ctrl+C encerra")
     args = parser.parse_args(argv)
 
-    print("1/4 Baixando catálogo (CSGO-API)...")
-    crates, _ = download(CATALOG_URL.format(arquivo="crates.json"), "crates.json")
-    all_cases = only_cases(crates)
+    caixas, skins, ligacoes = [], {}, []
+    if not args.so_precos:
+        print("1/4 Baixando catálogo (CSGO-API)...")
+        crates, _ = download(CATALOG_URL.format(arquivo="crates.json"), "crates.json")
+        all_cases = only_cases(crates)
 
-    if args.listar:
-        print(f"\n{len(all_cases)} caixas disponíveis:")
-        for case in sorted(all_cases, key=lambda c: c.get("first_sale_date") or ""):
-            print(f"  {case.get('first_sale_date') or '----/--/--'}  {case['name']}")
-        return 0
+        if args.listar:
+            print(f"\n{len(all_cases)} caixas disponíveis:")
+            for case in sorted(all_cases, key=lambda c: c.get("first_sale_date") or ""):
+                print(f"  {case.get('first_sale_date') or '----/--/--'}  {case['name']}")
+            return 0
 
-    if args.todas:
-        selected, warnings = all_cases, []
+        if args.todas:
+            selected, warnings = all_cases, []
+        else:
+            selected, warnings = select_cases(all_cases, args.caixas or CAIXAS_PADRAO)
+        for warning in warnings:
+            print(f"  ! {warning}")
+        if not selected:
+            print("Nenhuma caixa selecionada. Use --listar para ver os nomes.")
+            return 1
+
+        skins_json, _ = download(CATALOG_URL.format(arquivo="skins.json"), "skins.json")
+        by_id, by_name = index_skins(skins_json)
+        caixas, skins, ligacoes, avisos = build_catalog(selected, by_id, by_name)
+        for aviso in avisos[:15]:
+            print(f"  ! {aviso}")
+        if len(avisos) > 15:
+            print(f"  ! ... e mais {len(avisos) - 15} avisos")
     else:
-        selected, warnings = select_cases(all_cases, args.caixas or CAIXAS_PADRAO)
-    for warning in warnings:
-        print(f"  ! {warning}")
-    if not selected:
-        print("Nenhuma caixa selecionada. Use --listar para ver os nomes.")
-        return 1
-
-    skins_json, _ = download(CATALOG_URL.format(arquivo="skins.json"), "skins.json")
-    by_id, by_name = index_skins(skins_json)
-    caixas, skins, ligacoes, avisos = build_catalog(selected, by_id, by_name)
-    for aviso in avisos[:15]:
-        print(f"  ! {aviso}")
-    if len(avisos) > 15:
-        print(f"  ! ... e mais {len(avisos) - 15} avisos")
+        print("1/4 Catálogo: pulado (--so-precos).")
 
     # Import aqui (e não no topo) para o --listar funcionar mesmo sem banco configurado.
     from app.core.database import Database
     database = Database()
 
-    print(f"2/4 Gravando {len(caixas)} caixas e {len(skins)} skins no banco...")
-    save_catalog(database, caixas, skins, ligacoes)
-
-    prices = {}
-    if args.sem_precos:
-        print("3/4 Preços: pulado (--sem-precos). Itens novos recebem preço estimado.")
+    if caixas:
+        print(f"2/4 Gravando {len(caixas)} caixas e {len(skins)} skins no banco...")
+        save_catalog(database, caixas, skins, ligacoes)
     else:
-        print("3/4 Baixando preços em R$ (Skinport)...")
-        try:
-            items_json, _ = download(SKINPORT_ITEMS_URL, "skinport_items.json", needs_brotli=True)
-        except RuntimeError as error:
-            items_json = None
-            print(f"  ! Sem preços reais nesta execução: {error}")
-        if items_json is not None:
-            # O histórico só traz as médias de 7/30 dias: se falhar, os preços atuais continuam valendo.
-            try:
-                history_json, _ = download(SKINPORT_HISTORY_URL, "skinport_history.json", needs_brotli=True)
-            except RuntimeError as error:
-                history_json = []
-                print(f"  ! Médias de 7/30 dias indisponíveis nesta execução: {error}")
-            prices = index_prices(items_json, history_json)
-    total = update_prices(database, prices)
-    print(
-        f"    skins: {total['reais']} preços reais | {total['estimados']} estimados | "
-        f"{total['mantidos']} mantidos | caixas com preço real: {total['caixas_reais']}"
-    )
-    sem_preco_real = not args.sem_precos and total["reais"] == 0 and total["caixas_reais"] == 0
+        print("2/4 Gravação do catálogo: pulada.")
+    estimados = fill_missing_estimates(database)
+    if estimados:
+        print(f"    {estimados} preços estimados criados para itens novos (até a Steam responder).")
+
+    total, n_tarefas = None, 0
+    if args.sem_precos:
+        print("3/4 Preços: pulado (--sem-precos).")
+    elif args.continuo:
+        run_continuous(database, args.limite)
+        return 0
+    else:
+        tarefas = load_price_plan(database)
+        if args.limite:
+            tarefas = tarefas[:args.limite]
+        n_tarefas = len(tarefas)
+        minutos = n_tarefas * STEAM_INTERVALO / 60
+        print(f"3/4 Consultando {len(tarefas)} preços em R$ no mercado da Steam (~{minutos:.0f} min).")
+        print("    Pode interromper com Ctrl+C a qualquer momento: o progresso fica salvo e")
+        print("    a próxima execução continua do que falta.")
+        total = update_prices_from_steam(database, tarefas)
+        _print_total(total)
 
     if args.imagens:
         print("4/4 Baixando imagens (pode demorar alguns minutos)...")
@@ -576,18 +770,18 @@ def main(argv=None):
     else:
         print("4/4 Imagens: pulado (use --imagens para baixar).")
 
-    print("\nResumo do conteúdo importado:")
-    for caixa in caixas:
-        conteudo = [skins[s]["rarity_name"] for c, s in ligacoes if c == caixa["api_id"]]
-        por_raridade = ", ".join(f"{n}: {conteudo.count(n)}" for n in dict.fromkeys(conteudo))
-        print(f"  {caixa['name']}: {len(conteudo)} itens ({por_raridade})")
+    if caixas:
+        print("\nResumo do conteúdo importado:")
+        for caixa in caixas:
+            conteudo = [skins[s]["rarity_name"] for c, s in ligacoes if c == caixa["api_id"]]
+            por_raridade = ", ".join(f"{n}: {conteudo.count(n)}" for n in dict.fromkeys(conteudo))
+            print(f"  {caixa['name']}: {len(conteudo)} itens ({por_raridade})")
 
-    if sem_preco_real:
-        # Aviso bem visível: o catálogo foi importado, mas os preços NÃO são reais.
+    if total is not None and n_tarefas and total["reais"] == 0 and (total["parada"] or total["falhas"]):
+        # Aviso bem visível: houve problema (limite da Steam, rede ou interrupção) e nada foi atualizado.
         print("\n" + "!" * 70)
         print("ATENÇÃO: nenhum preço real foi obtido nesta execução.")
-        print("O catálogo foi importado, mas os itens novos estão com preço ESTIMADO.")
-        print("O motivo está na linha 'Sem preços reais' acima.")
+        print("O jogo funciona com os preços estimados, mas veja o motivo acima ('Parou antes do fim').")
         print("!" * 70)
         return 2
     print("\nPronto!")

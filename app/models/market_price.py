@@ -6,8 +6,10 @@ from app.core.game_rules import SOURCE_ESTIMATED, to_money, wear_label
 class Market_Price:
     """Preço atual de uma skin em um desgaste (tabela skin_prices).
 
-    Ex.: "AK-47 | Redline" em Field-Tested custa R$ 75,00 e a média dos
-    últimos 7 dias foi R$ 72,10 -> variação de +4,0%.
+    Ex.: "AK-47 | Redline" em Field-Tested custa R$ 75,00 (source "steam").
+    avg_7d/avg_30d são colunas reservadas: a Steam não informa médias, então
+    ficam None (e variation_7d também). A variação de preço pode ser
+    calculada pelo histórico (price_history).
     """
 
     def __init__(

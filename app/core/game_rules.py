@@ -102,7 +102,7 @@ WEAR_PRICE_FACTOR = {
 ESTIMATED_CASE_PRICE = Decimal("5.00")
 
 # Origem do preço (coluna "source" no banco)
-SOURCE_API = "skinport"
+SOURCE_API = "steam"          # preço real do mercado da Steam
 SOURCE_ESTIMATED = "estimado"
 
 

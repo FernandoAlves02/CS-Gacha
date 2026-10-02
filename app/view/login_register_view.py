@@ -96,6 +96,11 @@ COR_SUCESSO = (0.38, 0.85, 0.48, 1)
 
 TASK_PLACEHOLDER = "login_atualizar_placeholders"
 
+# O cenário 3D da Home começa a carregar em segundo plano logo depois que o
+# login aparece (o atraso deixa a tela de login ser desenhada primeiro).
+TASK_PRECARREGAR = "login_precarregar_cenario"
+ATRASO_PRECARREGAR = 0.5          # segundos
+
 
 def _z(y_px):
     """Converte a posição vertical da arte (px, de cima para baixo) em unidades do Panda3D."""
@@ -164,6 +169,12 @@ class LoginRegisterView:
         self.eventos.accept("tab", self._proximo_campo, [1])
         self.eventos.accept("shift-tab", self._proximo_campo, [-1])
         self.app.taskMgr.add(self._atualizar_placeholders, TASK_PLACEHOLDER)
+
+        # Enquanto o jogador digita, o cenário 3D da Home vai sendo carregado.
+        if self.view_manager.backdrop:
+            self.app.taskMgr.doMethodLater(
+                ATRASO_PRECARREGAR, self._precarregar_cenario, TASK_PRECARREGAR
+            )
 
     def _criar_campo(self, nome):
         """Monta um campo: fundo arredondado, fundo de foco (laranja), ícone,
@@ -413,6 +424,11 @@ class LoginRegisterView:
                 campo["mostrando_ph"] = vazio
         return task.cont
 
+    def _precarregar_cenario(self, task):
+        # Não trava a tela: o SceneBackdrop carrega os modelos numa thread.
+        self.view_manager.backdrop.precarregar()
+        return task.done
+
     def _ao_apertar_enter(self, _texto):
         self._submeter()
 
@@ -476,6 +492,7 @@ class LoginRegisterView:
     def destruir(self):
         self.eventos.ignoreAll()
         self.app.taskMgr.remove(TASK_PLACEHOLDER)
+        self.app.taskMgr.remove(TASK_PRECARREGAR)
         for elemento in self.elementos:
             elemento.destroy()
         self.elementos.clear()

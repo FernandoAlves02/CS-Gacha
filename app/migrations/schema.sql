@@ -106,9 +106,9 @@ create table skin_prices(
 	skin_catalog_id int not null,
 	wear varchar(20) not null,                    -- Factory New, Minimal Wear, ... ou Not Painted
 	price decimal(10,2) not null,
-	avg_7d decimal(10,2) null,                    -- média de vendas dos últimos 7 dias (API)
-	avg_30d decimal(10,2) null,                   -- média de vendas dos últimos 30 dias (API)
-	source varchar(20) not null,                  -- 'skinport' ou 'estimado'
+	avg_7d decimal(10,2) null,                    -- reservado: média de 7 dias (a Steam não informa; fica null)
+	avg_30d decimal(10,2) null,                   -- reservado: média de 30 dias (idem)
+	source varchar(20) not null,                  -- 'steam' ou 'estimado'
 	updated_at datetime not null,
 	primary key (skin_catalog_id, wear),
 	constraint fk_price_skin foreign key(skin_catalog_id) references skins_catalog(id),

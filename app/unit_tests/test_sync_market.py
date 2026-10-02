@@ -1,7 +1,7 @@
 """Testes do importador (só as partes que não usam internet nem banco).
 
 Os dados abaixo imitam o formato real da CSGO-API (crates.json / skins.json)
-e da Skinport (/v1/items e /v1/sales/history).
+e da API de preços do mercado da Steam (priceoverview).
 
 Rodar da raiz do projeto:
     python -m unittest app.unit_tests.test_sync_market -v
@@ -11,8 +11,21 @@ import unittest
 import urllib.error
 from decimal import Decimal
 from email.message import Message
+from unittest import mock
 
-from tools.sync_market import _describe_error, build_catalog, index_prices, index_skins, only_cases, select_cases
+import tools.sync_market as sync
+from tools.sync_market import (
+    SteamLimite,
+    _describe_error,
+    build_catalog,
+    fetch_steam_price,
+    index_skins,
+    only_cases,
+    parse_brl,
+    pick_steam_price,
+    plan_price_updates,
+    select_cases,
+)
 
 IMG = "https://community.akamai.steamstatic.com/economy/image/abc"
 
@@ -116,45 +129,105 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(len(self.ligacoes), len(set(self.ligacoes)))
 
 
-class PriceTests(unittest.TestCase):
+class SteamPriceTests(unittest.TestCase):
 
-    def test_preco_sugerido_e_medias(self):
-        items = [{"market_hash_name": "MP7 | Skulls (Field-Tested)", "suggested_price": 1.234,
-                  "min_price": 1.10, "median_price": 1.20}]
-        history = [{"market_hash_name": "MP7 | Skulls (Field-Tested)",
-                    "last_7_days": {"avg": 1.1, "median": 1.15}, "last_30_days": {"avg": 1.0}}]
-        prices = index_prices(items, history)
-        self.assertEqual(prices["MP7 | Skulls (Field-Tested)"],
-                         (Decimal("1.23"), Decimal("1.10"), Decimal("1.00")))
+    def test_converte_preco_em_reais(self):
+        self.assertEqual(parse_brl("R$ 31,82"), Decimal("31.82"))
+        self.assertEqual(parse_brl("R$ 1.234,56"), Decimal("1234.56"))
+        self.assertEqual(parse_brl("R$\xa012.345,00"), Decimal("12345.00"))   # espaço "duro" da Steam
+        for vazio in (None, "", "--", "R$ 0,00"):
+            self.assertIsNone(parse_brl(vazio))
 
-    def test_ordem_de_reserva_do_preco(self):
-        items = [
-            {"market_hash_name": "A", "suggested_price": None, "min_price": 9},
-            {"market_hash_name": "B", "suggested_price": 0, "median_price": None, "min_price": None},
-            {"market_hash_name": "C", "suggested_price": None},
+    def test_usa_mediana_e_depois_menor_anuncio(self):
+        resposta = {"success": True, "lowest_price": "R$ 31,82", "volume": "745", "median_price": "R$ 35,61"}
+        self.assertEqual(pick_steam_price(resposta), Decimal("35.61"))
+        self.assertEqual(pick_steam_price({"success": True, "lowest_price": "R$ 31,82"}), Decimal("31.82"))
+        self.assertIsNone(pick_steam_price({"success": True}))          # sem anúncio
+        self.assertIsNone(pick_steam_price({"success": False}))
+        self.assertIsNone(pick_steam_price(None))
+
+    def _http_error(self, code):
+        return urllib.error.HTTPError("https://steamcommunity.com/market/priceoverview/", code, "erro",
+                                      Message(), io.BytesIO(b"null"))
+
+    def test_limite_da_steam_vira_steamlimite(self):
+        with mock.patch.object(sync.urllib.request, "urlopen", side_effect=self._http_error(429)):
+            with self.assertRaises(SteamLimite):
+                fetch_steam_price("AK-47 | Redline (Field-Tested)")
+
+    def test_item_inexistente_nao_e_erro_de_rede(self):
+        with mock.patch.object(sync.urllib.request, "urlopen", side_effect=self._http_error(500)):
+            self.assertEqual(fetch_steam_price("Item Que Nao Existe"), {"success": False})
+
+    def test_sem_internet_vira_runtimeerror(self):
+        with mock.patch.object(sync.urllib.request, "urlopen", side_effect=urllib.error.URLError("sem rede")):
+            with self.assertRaises(RuntimeError):
+                fetch_steam_price("AK-47 | Redline (Field-Tested)")
+
+    def test_nome_com_caracteres_especiais_vai_codificado_na_url(self):
+        resposta = mock.MagicMock()
+        resposta.__enter__.return_value.read.return_value = b'{"success":true,"lowest_price":"R$ 10,00"}'
+        with mock.patch.object(sync.urllib.request, "urlopen", return_value=resposta) as urlopen:
+            fetch_steam_price("★ Karambit | Doppler (Factory New)")
+        url = urlopen.call_args[0][0].full_url
+        self.assertIn("currency=7", url)                                  # R$
+        self.assertIn("%E2%98%85%20Karambit%20%7C%20Doppler", url)         # ★, espaço e | codificados
+
+
+class PricePlanTests(unittest.TestCase):
+
+    def test_ordem_das_consultas(self):
+        caixas = [(1, "Chroma Case", "estimado", None), (2, "Glove Case", "steam", "2026-10-01 10:00:00")]
+        skins = [
+            (10, "★ Karambit", Decimal("0"), Decimal("0"), 5),                 # faca vanilla
+            (11, "AWP | Teste", Decimal("0"), Decimal("0.08"), 4),             # só FN e MW
+            (12, "P250 | Teste", Decimal("0"), Decimal("1"), 1),
         ]
-        history = [{"market_hash_name": "C", "last_7_days": {"median": 3.5}}]
-        prices = index_prices(items, history)
-        self.assertEqual(prices["A"][0], Decimal("9.00"))
-        self.assertNotIn("B", prices)                       # sem nenhum preço válido
-        self.assertEqual(prices["C"], (Decimal("3.50"), None, None))
+        existentes = {(12, "Field-Tested"): ("steam", "2026-09-01 10:00:00")}
+        plano = plan_price_updates(caixas, skins, existentes)
+        nomes = [t[3] for t in plano]
+        # 1º pendentes: caixa sem preço real, depois skins da raridade mais comum para a mais rara
+        self.assertEqual(nomes[0], "Chroma Case")
+        self.assertEqual(nomes[1:5], ["P250 | Teste (Factory New)", "P250 | Teste (Minimal Wear)",
+                                      "P250 | Teste (Well-Worn)", "P250 | Teste (Battle-Scarred)"])
+        self.assertEqual(nomes[5:8], ["AWP | Teste (Factory New)", "AWP | Teste (Minimal Wear)", "★ Karambit"])
+        # 2º os que já têm preço real, do mais antigo para o mais novo
+        self.assertEqual(nomes[8:], ["P250 | Teste (Field-Tested)", "Glove Case"])
+        self.assertEqual(plano[0][:3], ("caixa", 1, None))
+        self.assertEqual(plano[-3][2], "Not Painted")
 
-    def test_entradas_vazias(self):
-        self.assertEqual(index_prices(None, None), {})
+
+class ContinuousModeTests(unittest.TestCase):
+
+    def test_espera_entre_passadas(self):
+        self.assertEqual(sync.wait_before_next_pass({"motivo": None}), sync.PAUSA_ENTRE_PASSADAS)
+        self.assertEqual(sync.wait_before_next_pass({"motivo": "limite"}), sync.PAUSA_APOS_LIMITE)
+        self.assertEqual(sync.wait_before_next_pass({"motivo": "rede"}), sync.PAUSA_APOS_REDE)
+        self.assertIsNone(sync.wait_before_next_pass({"motivo": "ctrlc"}))
+
+    def test_repete_ate_ctrl_c_e_espera_mais_quando_a_steam_limita(self):
+        resultados = [
+            {"reais": 10, "sem_anuncio": 0, "falhas": 0, "parada": None, "motivo": None},
+            {"reais": 3, "sem_anuncio": 0, "falhas": 0, "parada": "limite", "motivo": "limite"},
+            {"reais": 5, "sem_anuncio": 0, "falhas": 0, "parada": "ctrl+c", "motivo": "ctrlc"},
+        ]
+        esperas = []
+        with mock.patch.object(sync, "load_price_plan", return_value=[("caixa", 1, None, "X")]), \
+                mock.patch.object(sync, "update_prices_from_steam", side_effect=resultados), \
+                mock.patch("builtins.print"):
+            passadas = sync.run_continuous(database=None, sleep=esperas.append)
+        self.assertEqual(passadas, 3)
+        self.assertEqual(esperas, [sync.PAUSA_ENTRE_PASSADAS, sync.PAUSA_APOS_LIMITE])
 
 
 class ErrorMessageTests(unittest.TestCase):
 
-    def _http_error(self, code, body):
-        return urllib.error.HTTPError("https://api.skinport.com/v1/items", code, "Forbidden", Message(), io.BytesIO(body))
-
-    def test_erro_http_mostra_codigo_e_resposta_da_api(self):
-        texto = _describe_error(self._http_error(403, b'{"errors":[{"id":"forbidden","message":"Access denied"}]}'))
+    def test_erro_http_mostra_codigo_e_resposta(self):
+        erro = urllib.error.HTTPError("https://exemplo", 403, "Forbidden", Message(),
+                                      io.BytesIO(b"<title>Just a moment...</title>"))
+        texto = _describe_error(erro)
         self.assertIn("HTTP 403", texto)
-        self.assertIn("Access denied", texto)
-
-    def test_limite_de_chamadas(self):
-        self.assertIn("aguarde 5 minutos", _describe_error(self._http_error(429, b"")))
+        self.assertIn("Just a moment", texto)
 
     def test_erro_sem_http(self):
         self.assertIn("TimeoutError", _describe_error(TimeoutError("timed out")))

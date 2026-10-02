@@ -43,7 +43,7 @@
 
 **Como o código das Fases 2 e 3 foi validado antes de chegar até você:**
 
-- **66 testes automáticos** (regras, sorteio, controllers, importador e login) passando.
+- **67 testes automáticos** (regras, sorteio, controllers, importador e login) passando.
 - **Simulação de 200.000 aberturas:** cada raridade ficou a menos de 0,07 ponto percentual da chance oficial, e a distribuição de desgaste saiu em 3/24/33/24/16%.
 - **Fluxo completo dos DAOs** rodado num banco de conferência gerado a partir do `schema.sql`: comprar, abrir, vender, comprar skin, preço que mudou, saldo insuficiente, inventário em 1.000, skin de outro jogador, rollback sem consumir a caixa e conexões sempre fechadas. 45 de 45 verificações passaram.
 - **Importador** testado com os **dados reais da CSGO-API** vindos do seu PC (6 caixas, 355 skins, 0 avisos) e com a Steam simulada (19 de 19): preço real, item sem anúncio, limite de consultas, sem internet, Ctrl+C e retomada.
@@ -255,6 +255,14 @@ Entregue em **2 partes** (o arquivo único passava do limite de envio): `cs-gach
 | `app/migrations/schema.sql` | ALTERADO (correção 2) | **Só comentários** (`'steam'` no lugar de `'skinport'`). **Não rode de novo** no seu PC (regra 2.2) |
 | `README.md` | ALTERADO | Convertido para UTF-8 (o do GitHub ainda está em UTF-16) |
 | `ROADMAP.md` | ALTERADO | Este documento |
+
+### 6.2 Correção 5 (02/10, 17h50): respostas de erro fechadas
+
+| Arquivo | Situação | O que é |
+|---|---|---|
+| `tools/sync_market.py` | ALTERADO | Fecha a resposta de erro da Steam (429, 500, 403...) depois de usar. Some o `ResourceWarning` do Python 3.14 na T3.1 |
+| `app/unit_tests/test_sync_market.py` | ALTERADO | + teste que confere que as respostas de erro são fechadas (67 testes) |
+| `ROADMAP.md` | ALTERADO | Este documento (dump do banco na 12.2 e ensaio na 12.1) |
 | `app/assets/maps/mirage_menu/` | NOVO | **Mirage recortada** (265 arquivos, ~50 MB, contra 337 MB do original): só o que a câmera da Home enxerga (com folga para a animação da Fase 6), sem as malhas de ferramenta do editor e com texturas reduzidas (cor até 1024 px, detalhe até 512 px). **Vai no Git** (nenhum arquivo passa de 25 MB). |
 | `app/view/scene_backdrop.py` | ALTERADO | Carrega mapa e personagem **em segundo plano** (`loadModel` com `callback`) e envia o cenário à placa de vídeo **aos poucos** enquanto o login está aberto. Usa a Mirage recortada; se ela não existir, cai no `de_mirage_d.glb` completo. |
 | `app/view/login_register_view.py` | ALTERADO | Meio segundo depois de aparecer, pede o pré-carregamento do cenário (`TASK_PRECARREGAR`). |
@@ -449,7 +457,9 @@ from price_history h join collections c on c.id = h.collection_id group by c.nam
 python -m unittest app.unit_tests.test_user_flow app.unit_tests.test_gacha_rules app.unit_tests.test_gacha_controllers app.unit_tests.test_sync_market
 ```
 **Validação**
-- [ ] Termina com `Ran 66 tests` e `OK`, sem nenhum traceback no meio.
+- [ ] Termina com `Ran 67 tests` e `OK`, sem nenhum traceback e sem `ResourceWarning` no meio.
+
+> Até a correção 4 apareciam 3 avisos `ResourceWarning: Implicitly cleaning up <HTTPError ...>` no Python 3.14: o importador não fechava as respostas de erro da Steam (429, 500 e 403). Não era falha de teste, mas era conexão ficando aberta; a correção 5 fecha essas respostas e tem um teste para isso.
 
 > O teste `test_erro_inesperado_nao_derruba_a_tela` simula o banco caindo de propósito. Ele captura o log do erro com `assertLogs`, para o traceback não aparecer na saída como se fosse uma falha.
 
@@ -644,7 +654,8 @@ git clone -b refactoring https://github.com/FernandoAlves02/CS-Gacha.git
 :: ou, se o projeto já estiver lá:  git pull
 ```
 - [ ] `python main.py` abre e o login funciona no PC do professor.
-- [ ] A Home mostra a Mirage sem travar (checklist da T3.5). Se aparecer `simplepbr não instalado` no terminal, rode `pip install -r requirements.txt` de novo.
+- [ ] A Home mostra a Mirage sem travar (checklist da T3.5).
+- [ ] *(recomendado)* **Ensaio do dump:** faça hoje o passo do dump da 12.2 com o banco que você já tem. Assim, na quinta, você já sabe que funciona lá. Se aparecer `simplepbr não instalado` no terminal, rode `pip install -r requirements.txt` de novo.
 - [ ] Anote: versão do Python, placa de vídeo, se há internet e se você tem permissão de administrador.
 
 ### 12.2 Quinta (08/10): atualizar para a versão final
@@ -653,13 +664,15 @@ git pull
 .venv\Scripts\activate
 pip install -r requirements.txt
 ```
-Depois leve o banco **pronto** do seu PC, que já tem os preços reais **e o histórico do fim de semana** (o gráfico depende dele). Use o **cmd**, não o PowerShell, por causa do `<`. O dump já recria o banco inteiro, então não precisa rodar o `schema.sql`:
+Depois leve o banco **pronto** do seu PC, que já tem os preços reais **e o histórico do fim de semana** (o gráfico depende dele). O dump é um arquivo `.sql` com o banco inteiro (tabelas + dados, alguns MB); ele recria tudo no PC do professor, então lá não precisa rodar o `schema.sql`. Use o **cmd**, não o PowerShell (o PowerShell não aceita o `<`).
   ```bat
-  :: no SEU PC
-  C:\xampp\mysql\bin\mysqldump -u root -p --databases csgacha > csgacha.sql
-  :: no PC do PROFESSOR (copie o csgacha.sql por pendrive)
-  C:\xampp\mysql\bin\mysql -u root -p < csgacha.sql
+  :: no SEU PC (pode ser com o coletor ainda rodando: --single-transaction tira uma "foto" consistente)
+  C:\xampp\mysql\bin\mysqldump -u root -p --single-transaction --default-character-set=utf8mb4 --databases csgacha --result-file=csgacha.sql
+  :: no PC do PROFESSOR (copie o csgacha.sql por pendrive ou Drive)
+  C:\xampp\mysql\bin\mysql -u root -p --default-character-set=utf8mb4 < csgacha.sql
   ```
+  O dump **substitui** as tabelas do PC do professor: contas criadas lá antes somem e passam a valer as do seu PC. O usuário do MySQL do `.env` (o `GRANT` da T2.3) não vai no dump; se o `.env` de lá não usa `root`, crie o usuário lá antes.
+- [ ] Confira nos dois PCs (DBeaver): `select count(*) from price_history;` dá o **mesmo número**.
 *Alternativa com internet lá:* `schema.sql` + `seed_base.sql`, depois `python tools/sync_market.py --sem-precos` (catálogo; as imagens vêm pelo Git) e `python tools/sync_market.py --so-precos` (deixe rodando).
 - [ ] Rode o autoteste (T3.2) e o roteiro de aceite **no PC do professor**.
 

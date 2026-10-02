@@ -159,6 +159,19 @@ class SteamPriceTests(unittest.TestCase):
         with mock.patch.object(sync.urllib.request, "urlopen", side_effect=self._http_error(500)):
             self.assertEqual(fetch_steam_price("Item Que Nao Existe"), {"success": False})
 
+    def test_respostas_de_erro_sao_fechadas(self):
+        # Sem fechar, o Python 3.14 mostra "ResourceWarning: Implicitly cleaning up <HTTPError ...>"
+        for code in (429, 500, 403):
+            corpo = io.BytesIO(b"null")
+            erro = urllib.error.HTTPError("https://steamcommunity.com/market/priceoverview/", code, "erro",
+                                          Message(), corpo)
+            with mock.patch.object(sync.urllib.request, "urlopen", side_effect=erro):
+                try:
+                    fetch_steam_price("AK-47 | Redline (Field-Tested)")
+                except (SteamLimite, RuntimeError):
+                    pass
+            self.assertTrue(corpo.closed, f"HTTP {code} ficou aberto")
+
     def test_sem_internet_vira_runtimeerror(self):
         with mock.patch.object(sync.urllib.request, "urlopen", side_effect=urllib.error.URLError("sem rede")):
             with self.assertRaises(RuntimeError):
@@ -228,6 +241,7 @@ class ErrorMessageTests(unittest.TestCase):
         texto = _describe_error(erro)
         self.assertIn("HTTP 403", texto)
         self.assertIn("Just a moment", texto)
+        self.assertTrue(erro.fp is None or erro.fp.closed)   # leu o motivo e fechou
 
     def test_erro_sem_http(self):
         self.assertIn("TimeoutError", _describe_error(TimeoutError("timed out")))

@@ -134,6 +134,10 @@ def _describe_error(error):
             detalhe = " ".join(corpo.decode("utf-8", "replace").split())[:300]
         except Exception:
             pass
+        finally:
+            # A resposta de erro guarda a conexão aberta: fecha depois de ler
+            # (o Python 3.14 mostra "ResourceWarning" se ela ficar aberta).
+            error.close()
         return f"HTTP {error.code} {error.reason}" + (f" | resposta: {detalhe}" if detalhe else "")
     return f"{error.__class__.__name__}: {error}"
 
@@ -295,10 +299,12 @@ def fetch_steam_price(market_hash_name, timeout=30):
             return json.loads(response.read().decode("utf-8") or "null") or {"success": False}
     except urllib.error.HTTPError as error:
         if error.code == 429:
+            error.close()                  # libera a conexão (ver _describe_error)
             raise SteamLimite() from error
         if error.code in (400, 404, 500):
+            error.close()
             return {"success": False}      # a Steam responde 500 para nome que não existe
-        raise RuntimeError(_describe_error(error)) from error
+        raise RuntimeError(_describe_error(error)) from error   # _describe_error fecha
     except Exception as error:             # sem internet, tempo esgotado, JSON inválido
         raise RuntimeError(_describe_error(error)) from error
 

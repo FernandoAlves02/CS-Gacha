@@ -1,4 +1,5 @@
 # CS Gacha — Roadmap v2 e Tutorial de Integração (Fases 2 a 5)
+# CS Gacha — Roadmap v2 e Tutorial de Integração (Fases 2 a 5)
 
 > Atualizado em **02/10/2026**. Substitui o roadmap de 01/10.
 > Base: Documentação do Projeto, branch `refactoring` e as respostas às decisões D1–D12.
@@ -18,6 +19,7 @@
 7. [Tutorial — Fase 2 (dados reais no banco)](#7-tutorial--fase-2-dados-reais-no-banco)
 8. [Tutorial — Fase 3 (backend do gacha + nova tela de login)](#8-tutorial--fase-3-backend-do-gacha--nova-tela-de-login)
 9. [Entendendo o código (para a apresentação)](#9-entendendo-o-código-para-a-apresentação)
+10. [Fases 4 a 7 (tutorial das Fases 4 e 5)](#10-fases-4-a-7)
 10. [Fases 4 a 7 (tutorial das Fases 4 e 5)](#10-fases-4-a-7)
 11. [Calendário](#11-calendário)
 12. [PC do professor](#12-pc-do-professor)
@@ -45,6 +47,7 @@
 **Como o código das Fases 2 e 3 foi validado antes de chegar até você:**
 
 - **Testes automáticos** (regras, sorteio, controllers, importador e login) passando: 67 nas Fases 2 e 3, 74 com as Fases 4 e 5.
+- **Testes automáticos** (regras, sorteio, controllers, importador e login) passando: 67 nas Fases 2 e 3, 74 com as Fases 4 e 5.
 - **Simulação de 200.000 aberturas:** cada raridade ficou a menos de 0,07 ponto percentual da chance oficial, e a distribuição de desgaste saiu em 3/24/33/24/16%.
 - **Fluxo completo dos DAOs** rodado num banco de conferência gerado a partir do `schema.sql`: comprar, abrir, vender, comprar skin, preço que mudou, saldo insuficiente, inventário em 1.000, skin de outro jogador, rollback sem consumir a caixa e conexões sempre fechadas. 45 de 45 verificações passaram.
 - **Importador** testado com os **dados reais da CSGO-API** vindos do seu PC (6 caixas, 355 skins, 0 avisos) e com a Steam simulada (19 de 19): preço real, item sem anúncio, limite de consultas, sem internet, Ctrl+C e retomada.
@@ -62,6 +65,7 @@
 2. **Extras 2** e **Extras 3** (seção 10): testes, checklist e commit de cada um. *Cada ZIP já contém os anteriores; extraia sempre na ordem 1 → 2 → 3.*
 3. Deixar o **coletor de preços** rodando (**T2.6**) no fim de semana.
 
+> **O que eu NÃO consegui testar aqui:** a sua **placa de vídeo** (os prints daqui não têm o cenário 3D nem o PBR, e o renderizador por software deixa as imagens um pouco serrilhadas), o **MariaDB do XAMPP** e as **APIs reais**. Por isso cada fase tem o checklist visual no seu PC. Se algo falhar, copie a mensagem inteira e me mande.
 > **O que eu NÃO consegui testar aqui:** a sua **placa de vídeo** (os prints daqui não têm o cenário 3D nem o PBR, e o renderizador por software deixa as imagens um pouco serrilhadas), o **MariaDB do XAMPP** e as **APIs reais**. Por isso cada fase tem o checklist visual no seu PC. Se algo falhar, copie a mensagem inteira e me mande.
 
 ---
@@ -328,6 +332,28 @@ ZIP `cs-gacha-fases-4-5.zip`, feito a partir do seu commit `3d35974`.
 | `app/unit_tests/test_gacha_rules.py`, `test_gacha_controllers.py` | ALTERADOS | + 7 testes (74 no total) |
 | `ROADMAP.md` | ALTERADO | Este documento |
 
+### 6.3 Fases 4 e 5 (02/10, noite): Mercado, Inventário, venda e abertura
+
+ZIP `cs-gacha-fases-4-5.zip`, feito a partir do seu commit `3d35974`.
+
+| Arquivo | Situação | O que é |
+|---|---|---|
+| `app/view/ui_kit.py` | NOVO | Peças de interface no estilo CS2 usadas pelas telas novas: cartão de item, botões, abas, paginação, caixa de busca, janela (pop-up), aviso que some sozinho, barra de desgaste e o **gráfico de preços** (com `LineSegs`, sem biblioteca nova) |
+| `app/view/market_view.py` | NOVO | **Mercado** (Fase 4): abas CAIXAS e SKINS, painel de detalhes, compra com confirmação, busca, filtros de raridade, páginas e ▲▼ de 24 h |
+| `app/view/inventory_view.py` | REESCRITO | **Inventário** (Fase 5): itens reais, contador "x / 1.000", destaque + menu do item, pop-up de DETALHES, VENDER com valor final e confirmação |
+| `app/view/case_opening.py` | NOVO | **Abertura de caixa** com a roleta (visual do protótipo do grupo, agora com as skins reais) |
+| `app/view/game_view_base.py` | ALTERADO | Header: "MERCADO" no lugar de "LOJA", fonte Inter, item da tela atual sublinhado de laranja, saldo em R$ e `atualizar_saldo()` |
+| `app/view/home_view.py` | ALTERADO | Só informa a rota (`ROTA = "home"`) para o header destacar |
+| `app/view/login_register_view.py` | ALTERADO | **Correção de um erro meu:** a fonte Inter nunca carregava (o `loadFont` do Panda3D só aceita o caminho como texto e eu passava um `Filename`), então o login usava a fonte padrão. Agora usa a Inter de verdade, como no mockup |
+| `app/controller/market_controller.py` | ALTERADO | + `price_changes()` (▲▼ da página inteira numa consulta) e `list_rarities()` (filtros) |
+| `app/controller/inventory_controller.py` | ALTERADO | + `case_contents()` (prévia e cartões da roleta) |
+| `app/dao/skin_catalog_dao.py` | ALTERADO | + `get_history_for_listings()`: últimos 60 pontos de cada anúncio da página (usa `ROW_NUMBER()`, do MariaDB 10.2+) |
+| `app/core/game_rules.py` | ALTERADO | + `price_change()`: variação do preço em 24 h |
+| `app/controller/view_manager.py` | ALTERADO | Guarda os DAOs que as telas novas usam |
+| `main.py` | ALTERADO | Cria os DAOs e registra a rota `"shop"` (MERCADO) |
+| `app/unit_tests/test_gacha_rules.py`, `test_gacha_controllers.py` | ALTERADOS | + 7 testes (74 no total) |
+| `ROADMAP.md` | ALTERADO | Este documento |
+
 ## 7. Tutorial — Fase 2 (dados reais no banco)
 
 ### T2.1 Trazer os arquivos para o projeto (10 min)
@@ -514,6 +540,7 @@ from price_history h join collections c on c.id = h.collection_id group by c.nam
 python -m unittest app.unit_tests.test_user_flow app.unit_tests.test_gacha_rules app.unit_tests.test_gacha_controllers app.unit_tests.test_sync_market
 ```
 **Validação**
+- [ ] Termina com `Ran 74 tests` (eram 67 antes das Fases 4 e 5) e `OK`, sem nenhum traceback e sem `ResourceWarning` no meio.
 - [ ] Termina com `Ran 74 tests` (eram 67 antes das Fases 4 e 5) e `OK`, sem nenhum traceback e sem `ResourceWarning` no meio.
 
 > Até a correção 4 apareciam 3 avisos `ResourceWarning: Implicitly cleaning up <HTTPError ...>` no Python 3.14: o importador não fechava as respostas de erro da Steam (429, 500 e 403). Não era falha de teste, mas era conexão ficando aberta; a correção 5 fecha essas respostas e tem um teste para isso.

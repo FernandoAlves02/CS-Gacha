@@ -141,6 +141,10 @@ class LoginRegisterView:
         # (detalhes em ui_kit.fonte_inter). Sem o arquivo, usa a fonte padrão.
         self.fonte = fonte_inter(self.app, negrito=False, escala=FONTE_CAMPO * PX)
         self.fonte_bold = fonte_inter(self.app, negrito=True, escala=FONTE_BOTAO * PX)
+        # Fonte Inter na resolução certa para o tamanho dos textos desta tela
+        # (detalhes em ui_kit.fonte_inter). Sem o arquivo, usa a fonte padrão.
+        self.fonte = fonte_inter(self.app, negrito=False, escala=FONTE_CAMPO * PX)
+        self.fonte_bold = fonte_inter(self.app, negrito=True, escala=FONTE_BOTAO * PX)
         if self.fonte_bold is None:
             self.fonte_bold = self.fonte
 

@@ -10,6 +10,7 @@ Rodar da raiz do projeto:
 import random
 import unittest
 from datetime import datetime, timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from app.controller.inventory_controller import Inventory_Controller
@@ -61,6 +62,9 @@ class FakeRarityDAO:
     def get_all(self):
         return list(RARIDADES.values())
 
+    def get_all(self):
+        return list(RARIDADES.values())
+
 
 class FakeSkinCatalogDAO:
     def count_market_listings(self, search="", rarity_id=None):
@@ -69,6 +73,13 @@ class FakeSkinCatalogDAO:
     def get_market_listings(self, search="", limit=24, offset=0, rarity_id=None):
         self.ultimo = (search, limit, offset)
         return []
+
+    def get_history_for_listings(self, listings):
+        agora = datetime(2026, 10, 5, 8, 0)
+        historico = {par: [] for par in listings}
+        historico[(10, "Field-Tested")] = [(agora - timedelta(hours=24), Decimal("2.00")),
+                                           (agora, Decimal("2.50"))]
+        return historico
 
     def get_history_for_listings(self, listings):
         agora = datetime(2026, 10, 5, 8, 0)
@@ -283,6 +294,13 @@ class InventoryControllerTests(unittest.TestCase):
         self.user = novo_usuario()
         return Inventory_Controller(self.inv, FakeCollectionDAO(), FakeRarityDAO(), self.view, self.user,
                                     random.Random(4))
+
+    def test_conteudo_da_caixa_para_a_roleta(self):
+        tabela = self._controller().case_contents(1)
+        self.assertEqual([s.id for s, _ in tabela], [10, 11])
+        self.assertAlmostEqual(float(sum(c for _, c in tabela)), 1.0, places=12)
+        self.assertEqual(self._controller().case_contents(99), [])       # caixa sem itens
+        self.assertFalse(self.view.last[1])                               # avisa o jogador
 
     def test_conteudo_da_caixa_para_a_roleta(self):
         tabela = self._controller().case_contents(1)

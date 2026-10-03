@@ -14,10 +14,12 @@ MENU_ITEMS = [
     ("EQUIPAMENTO", "equipment"),
     ("HOME", "home"),
     ("MERCADO", "shop"),
+    ("MERCADO", "shop"),
     ("NOTÍCIAS", "news"),
 ]
 
 COR_MENU = (0.85, 0.85, 0.85, 1)
+COR_MENU_ATIVO = (1, 1, 1, 1)
 COR_MENU_ATIVO = (1, 1, 1, 1)
 COR_SEPARADOR = (0.4, 0.4, 0.4, 1)
 
@@ -27,7 +29,11 @@ class GameViewBase:
 
     Cada tela filha só implementa construir_conteudo() e informa a sua ROTA
     (o item do menu dessa tela fica destacado).
+    Cada tela filha só implementa construir_conteudo() e informa a sua ROTA
+    (o item do menu dessa tela fica destacado).
     """
+
+    ROTA = None
 
     ROTA = None
 
@@ -102,8 +108,16 @@ class GameViewBase:
         fonte = self.ui.fonte(negrito=True, escala=0.035)
         larguras = [self.ui.largura_texto(texto, 0.035, negrito=True) for texto, _rota in itens]
         x = -(sum(larguras) + espaco * (len(itens) - 1)) / 2
+        # Menu centralizado: cada item ocupa a largura do seu texto + um espaço fixo
+        espaco = 0.12
+        fonte = self.ui.fonte(negrito=True, escala=0.035)
+        larguras = [self.ui.largura_texto(texto, 0.035, negrito=True) for texto, _rota in itens]
+        x = -(sum(larguras) + espaco * (len(itens) - 1)) / 2
 
         for i, (texto, rota) in enumerate(itens):
+            pos_x = x + larguras[i] / 2
+            x += larguras[i] + espaco
+            ativo = rota == self.ROTA
             pos_x = x + larguras[i] / 2
             x += larguras[i] + espaco
             ativo = rota == self.ROTA
@@ -111,6 +125,9 @@ class GameViewBase:
             DirectButton(
                 text=texto,
                 text_scale=0.035,
+                text_font=fonte,
+                text_fg=COR_MENU_ATIVO if ativo else COR_MENU,
+                text2_fg=COR_MENU_ATIVO,             # estado 2 = mouse em cima
                 text_font=fonte,
                 text_fg=COR_MENU_ATIVO if ativo else COR_MENU,
                 text2_fg=COR_MENU_ATIVO,             # estado 2 = mouse em cima
@@ -132,6 +149,17 @@ class GameViewBase:
                     pos=(pos_x, 0, -0.045),
                     parent=self.header_frame
                 )
+            )
+
+            # Tela atual: sublinhado laranja embaixo do item do menu
+            if ativo:
+                largura = larguras[i]
+                DirectFrame(
+                    frameColor=COR_LARANJA,
+                    frameSize=(-largura / 2, largura / 2, -0.004, 0.004),
+                    pos=(pos_x, 0, -0.045),
+                    parent=self.header_frame
+                )
 
             # Separador vertical "|" (só visual) exceto após o último item
             if i < len(itens) - 1:
@@ -141,6 +169,7 @@ class GameViewBase:
                     text_fg=COR_SEPARADOR,
                     frameColor=(0, 0, 0, 0),
                     pos=(x - espaco / 2, 0, -0.012),
+                    pos=(x - espaco / 2, 0, -0.012),
                     parent=self.header_frame
                 )
 
@@ -149,6 +178,7 @@ class GameViewBase:
         self.lbl_usuario = DirectButton(
             text=f"{user.username}  |  {format_money(user.balance)}",
             text_scale=0.035,
+            text_font=self.ui.fonte(escala=0.035),
             text_font=self.ui.fonte(escala=0.035),
             text_fg=COR_MENU,
             text2_fg=COR_LARANJA,                # mouse em cima: laranja (é clicável)
@@ -169,7 +199,9 @@ class GameViewBase:
             text=t("SAIR"),
             text_scale=0.035,
             text_font=fonte,
+            text_font=fonte,
             text_fg=COR_MENU,
+            text2_fg=COR_MENU_ATIVO,
             text2_fg=COR_MENU_ATIVO,
             frameColor=(0, 0, 0, 0),
             relief=None,

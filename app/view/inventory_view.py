@@ -74,6 +74,12 @@ class InventoryView(GameViewBase):
     # CONSTRUÇÃO
     # ==================================================================
 
+    ROTA = "inventory"
+
+    # ==================================================================
+    # CONSTRUÇÃO
+    # ==================================================================
+
     def construir_conteudo(self):
         vm = self.view_manager
         self.app = vm.app

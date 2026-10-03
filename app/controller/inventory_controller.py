@@ -2,6 +2,7 @@ import logging
 import random
 
 from app.core.drop_service import draw_drop, drop_table
+from app.core.drop_service import draw_drop, drop_table
 from app.core.game_rules import INVENTORY_LIMIT, format_money
 from app.core.i18n import t
 from app.models.drop_result import Drop_Result

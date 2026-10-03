@@ -1,0 +1,22 @@
+Sons e música do CS Gacha (Extras 5) - todos em DOMÍNIO PÚBLICO (CC0)
+=====================================================================
+
+Efeitos de interface (clique, tique da roleta, sucesso, erro, resultado, raro)
+  "Interface Sounds" 1.0 - Kenney (www.kenney.nl)
+  https://opengameart.org/content/interface-sounds
+  Licença: CC0 (ver LICENCA_KENNEY.txt). Crédito não obrigatório, mas dado aqui.
+  Arquivos usados (renomeados):
+    clique.ogg    <- click_001.ogg
+    tique.ogg     <- tick_002.ogg
+    sucesso.ogg   <- confirmation_003.ogg
+    erro.ogg      <- error_008.ogg
+    resultado.ogg <- confirmation_002.ogg
+    raro.ogg      <- confirmation_004.ogg
+
+Música do menu (em loop)
+  "Main Menu Music (Loop)" - Alex McCulloch (Pro Sensory)
+  https://opengameart.org/content/main-menu-music-loop
+  Licença: CC0. O autor pede que o nome dele esteja nos créditos: Alex McCulloch.
+  musica_menu.ogg <- main_menu_music_mastered.mp3 (convertido para OGG Vorbis)
+
+Os sons originais do Counter-Strike (Valve) NÃO são usados.

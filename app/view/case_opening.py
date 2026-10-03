@@ -15,6 +15,9 @@ Como no CS2, facas e luvas aparecem na roleta como um cartão dourado
 
 Fluxo:  prévia (conteúdo + ABRIR) -> roleta girando (~6,5 s; clique ou ESPAÇO pula)
         -> resultado (ACEITAR | ABRIR OUTRA | VER DETALHES)
+
+A CAIXA GRÁTIS (Extras 4) usa a mesma tela com gratis=True: sem chave, sem
+"ABRIR OUTRA" (a próxima só daqui a 10 min) e o sorteio vem da tabela dela.
 """
 import random
 
@@ -23,6 +26,7 @@ from panda3d.core import Point3
 
 from app.core.game_rules import KEY_PRICE, format_money, rarity_label
 from app.core.i18n import numero, t
+from app.view.sons import tocar_som
 from app.view.ui_kit import (
     CENTRO,
     COR_CARD,
@@ -50,6 +54,7 @@ VENCEDOR = 52                # posição do item sorteado na fila de cartões
 DURACAO_GIRO = 6.5           # segundos
 
 RARIDADE_ESPECIAL = "Special Item"
+RARIDADES_COM_SOM_RARO = ("Covert", "Contraband", RARIDADE_ESPECIAL)   # resultado com som especial
 
 
 def desacelerar(t):
@@ -69,8 +74,10 @@ class AberturaDeCaixa:
     ao_mudar_saldo(): atualizar o saldo do header (a chave foi cobrada).
     """
 
-    def __init__(self, kit, pai, controller, caixa, tabela, ao_sair, ao_ver_detalhes, ao_mudar_saldo):
+    def __init__(self, kit, pai, controller, caixa, tabela, ao_sair, ao_ver_detalhes, ao_mudar_saldo,
+                 gratis=False):
         self.kit = kit
+        self.gratis = gratis            # caixa grátis: abre sem chave (controller.open_free_case)
         self.controller = controller
         self.caixa = caixa
         self.quantidade = caixa.quantity or 1
@@ -103,7 +110,9 @@ class AberturaDeCaixa:
             self.area_titulo.destroy()
         self.area_titulo = area = self.kit.container(self.raiz)
         self.kit.texto(area, limpar_nome(self.caixa.name), 0, 0.74, 0.07, COR_TEXTO, CENTRO, negrito=True)
-        if self.quantidade == 1:
+        if self.gratis:
+            restam = t("Sem chave · 1 grátis a cada 10 minutos")
+        elif self.quantidade == 1:
             restam = t("Você tem {n} caixa desta", n=self.quantidade)
         else:
             restam = t("Você tem {n} caixas desta", n=self.quantidade)
@@ -212,8 +221,11 @@ class AberturaDeCaixa:
             kit.texto(area, t("+ {n} itens", n=len(normais) - 17), ROLETA_X2, -0.10, 0.024, COR_TEXTO_3, DIREITA)
 
         kit.botao(area, t("VOLTAR"), -0.30, -0.80, 0.44, 0.095, self.sair, tipo="secundario", escala=0.032)
-        kit.botao(area, t("ABRIR CAIXA  ·  chave {preco}", preco=format_money(KEY_PRICE)), 0.30, -0.80, 0.66, 0.095, self.abrir,
-                  escala=0.032, ativo=bool(self.tabela))
+        if self.gratis:
+            texto_abrir = t("ABRIR GRÁTIS")
+        else:
+            texto_abrir = t("ABRIR CAIXA  ·  chave {preco}", preco=format_money(KEY_PRICE))
+        kit.botao(area, texto_abrir, 0.30, -0.80, 0.66, 0.095, self.abrir, escala=0.032, ativo=bool(self.tabela))
 
     # ==================================================================
     # ABRIR E GIRAR
@@ -223,7 +235,10 @@ class AberturaDeCaixa:
         """1) backend sorteia e salva; 2) só então a roleta é montada e gira."""
         if self.estado == "girando" or not self.tabela:
             return
-        resultado = self.controller.open_case(self.caixa.id)
+        if self.gratis:
+            resultado = self.controller.open_free_case(self.tabela)
+        else:
+            resultado = self.controller.open_case(self.caixa.id)
         if resultado is None:
             return                              # o controller já mostrou o motivo (saldo, caixa...)
         self.resultado = resultado
@@ -238,6 +253,7 @@ class AberturaDeCaixa:
         # Para no cartão VENCEDOR, num ponto aleatório dentro dele (fica mais natural)
         desvio = self.sorteio_visual.uniform(-0.40, 0.40) * CARTAO_L
         self.x_final = -(VENCEDOR * PASSO + desvio)
+        self.cartao_no_marcador = self._cartao_no_meio(self.x_inicio)   # "tique" a cada cartão que passa
         self.sequencia = Sequence(
             LerpFunc(self._mover_fila, fromData=0.0, toData=1.0, duration=DURACAO_GIRO),
             Func(self._mostrar_resultado),
@@ -246,6 +262,16 @@ class AberturaDeCaixa:
 
     def _mover_fila(self, t):
         self.fila.setX(self.x_inicio + (self.x_final - self.x_inicio) * desacelerar(t))
+        # "tique" quando um cartão novo chega ao marcador do meio (rápido no começo, devagar no fim)
+        cartao = self._cartao_no_meio(self.fila.getX())
+        if cartao != self.cartao_no_marcador:
+            self.cartao_no_marcador = cartao
+            tocar_som(self.kit.app, "tique")
+
+    @staticmethod
+    def _cartao_no_meio(x_fila):
+        """Índice do cartão que está em cima do marcador (o marcador fica no x = 0)."""
+        return int(-x_fila / PASSO + 0.5)
 
     def pular(self):
         """Clique na roleta / ESPAÇO: vai direto para o resultado."""
@@ -264,6 +290,8 @@ class AberturaDeCaixa:
         skin = instancia.skin
         cor = COR_OURO if e_especial(skin) else skin.rarity.color_rgba
         self._desenhar_titulo()
+        raro = skin.rarity is not None and skin.rarity.name in RARIDADES_COM_SOM_RARO
+        tocar_som(self.kit.app, "raro" if raro else "resultado")
 
         area = self._nova_area_baixo()
         # cartão grande com o item ganho

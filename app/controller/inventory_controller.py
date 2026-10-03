@@ -1,9 +1,16 @@
 import logging
 import random
+from datetime import datetime
 
-from app.core.drop_service import draw_drop, drop_table
-from app.core.drop_service import draw_drop, drop_table
-from app.core.game_rules import INVENTORY_LIMIT, format_money
+from app.core.drop_service import draw_drop, draw_from_table, drop_table, free_case_table
+from app.core.game_rules import (
+    FREE_CASE_COMMON_COUNT,
+    FREE_CASE_RARE_CHANCE,
+    FREE_CASE_RARE_MIN_PRICE,
+    INVENTORY_LIMIT,
+    format_money,
+    free_case_wait,
+)
 from app.core.i18n import t
 from app.models.drop_result import Drop_Result
 from app.models.skin_instance import Skin_Instance
@@ -22,13 +29,16 @@ class Inventory_Controller:
     atualizado aqui depois de abrir caixa (chave) ou vender.
     """
 
-    def __init__(self, inventory_dao, collection_dao, rarity_dao, view, user, rng=random):
+    def __init__(self, inventory_dao, collection_dao, rarity_dao, view, user, rng=random, skin_catalog_dao=None,
+                 clock=datetime.now):
         self.inventory_dao = inventory_dao
         self.collection_dao = collection_dao
         self.rarity_dao = rarity_dao
+        self.skin_catalog_dao = skin_catalog_dao    # conteúdo da caixa grátis (preços atuais)
         self.view = view
         self.user = user
         self.rng = rng          # nos testes passamos random.Random(semente)
+        self.clock = clock      # hora atual (nos testes, um relógio "de mentira")
 
     # ----------------------------------------------------------
     # LISTAGEM
@@ -104,6 +114,84 @@ class Inventory_Controller:
         self.user.balance = new_balance
         instance = Skin_Instance(new_id, self.user.id, skin.id, float_value, skin_price, skin=skin)
         return Drop_Result(instance, collection_id, new_balance, remaining)
+
+    # ----------------------------------------------------------
+    # CAIXA GRÁTIS (saldo abaixo da chave; 1 a cada 10 minutos)
+    # ----------------------------------------------------------
+
+    def free_case_wait(self):
+        """None = não vale agora (o saldo paga a chave); timedelta(0) = pode abrir;
+        timedelta > 0 = quanto falta. A tela usa para mostrar o botão ou a contagem."""
+        try:
+            balance, last = self.inventory_dao.get_free_case_state(self.user.id)
+        except Exception:
+            logger.exception("Falha ao consultar a caixa grátis")
+            return None
+        return free_case_wait(balance, last, self.clock())
+
+    def free_case_contents(self):
+        """Tabela [(Skin_Catalog, chance)] da caixa grátis: skins baratas + 1 rara (5%)."""
+        try:
+            baratas, rara = self.skin_catalog_dao.get_free_case_pool(FREE_CASE_COMMON_COUNT,
+                                                                     FREE_CASE_RARE_MIN_PRICE)
+            return free_case_table(baratas, rara, FREE_CASE_RARE_CHANCE)
+        except ValueError as e:
+            self.view.show_message(str(e), False)
+        except Exception:
+            logger.exception("Falha ao montar a caixa grátis")
+            self.view.show_message(t("Não foi possível carregar o conteúdo da caixa."), False)
+        return []
+
+    def open_free_case(self, table):
+        """Abre a caixa grátis com a tabela mostrada na tela. Devolve Drop_Result ou None.
+        Mesmo fluxo da caixa normal: sorteia aqui, o DAO confere a regra e salva."""
+        try:
+            skin, float_value, _wear = draw_from_table(table, self.rng)
+            new_id, skin_price, balance = self.inventory_dao.open_free_case(
+                self.user.id, skin.id, float_value, self.clock()
+            )
+
+        except ValueError as e:
+            self.view.show_message(str(e), False)
+            return None
+
+        except Exception:
+            logger.exception("Falha ao abrir a caixa grátis")
+            self.view.show_message(t("Não foi possível abrir a caixa. Verifique a conexão com o banco."), False)
+            return None
+
+        self.user.balance = balance
+        instance = Skin_Instance(new_id, self.user.id, skin.id, float_value, skin_price, skin=skin)
+        return Drop_Result(instance, None, balance, 0)
+
+    # ----------------------------------------------------------
+    # SKIN EM DESTAQUE NA HOME
+    # ----------------------------------------------------------
+
+    def featured_skin_id(self):
+        """Id da skin escolhida para o pedestal da Home (None = nenhuma)."""
+        try:
+            return self.inventory_dao.get_featured_skin_id(self.user.id)
+        except Exception:
+            logger.exception("Falha ao consultar a skin em destaque")
+            return None
+
+    def set_featured(self, skin_instance_id):
+        """Coloca a skin no pedestal da Home (None tira). Devolve True/False."""
+        try:
+            self.inventory_dao.set_featured_skin(self.user.id, skin_instance_id)
+        except ValueError as e:
+            self.view.show_message(str(e), False)
+            return False
+        except Exception:
+            logger.exception("Falha ao escolher a skin em destaque")
+            self.view.show_message(t("Não foi possível salvar a skin em destaque."), False)
+            return False
+        if skin_instance_id is None:
+            self.view.show_message(t("A Home volta a mostrar a sua skin mais valiosa."))
+        else:
+            self.view.show_message(t("Skin em destaque na Home!"))
+        return True
 
     # ----------------------------------------------------------
     # VENDER SKIN

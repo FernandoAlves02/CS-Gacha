@@ -178,5 +178,45 @@ class PriceChangeTests(unittest.TestCase):
         self.assertIsNone(rules.price_change(self.pontos("0.00", "5.00")))
 
 
+class FreeCaseTests(unittest.TestCase):
+    """Caixa grátis (Extras 4): só sem saldo para a chave, 1 a cada 10 min, rara com 5%."""
+
+    AGORA = datetime(2026, 10, 5, 20, 0, 0)
+
+    def test_so_vale_sem_saldo_para_a_chave(self):
+        self.assertIsNone(rules.free_case_wait(rules.KEY_PRICE, None, self.AGORA))
+        self.assertEqual(rules.free_case_wait(Decimal("13.49"), None, self.AGORA), timedelta(0))
+
+    def test_uma_a_cada_dez_minutos(self):
+        ha_3_min = self.AGORA - timedelta(minutes=3)
+        self.assertEqual(rules.free_case_wait(Decimal("0"), ha_3_min, self.AGORA), timedelta(minutes=7))
+        ha_10_min = self.AGORA - rules.FREE_CASE_COOLDOWN
+        self.assertEqual(rules.free_case_wait(Decimal("0"), ha_10_min, self.AGORA), timedelta(0))
+        no_futuro = self.AGORA + timedelta(hours=1)          # relógio do PC voltou no tempo
+        self.assertEqual(rules.free_case_wait(Decimal("0"), no_futuro, self.AGORA), rules.FREE_CASE_COOLDOWN)
+
+    def test_formato_da_contagem(self):
+        self.assertEqual(rules.format_wait(timedelta(minutes=7, seconds=5)), "07:05")
+        self.assertEqual(rules.format_wait(timedelta(seconds=0.2)), "00:01")      # nunca 00:00 antes da hora
+        self.assertEqual(rules.format_wait(timedelta(0)), "00:00")
+
+    def test_tabela_soma_100_e_a_rara_tem_5(self):
+        baratas = [skin(i, 1) for i in range(1, 9)]
+        rara = skin(99, 4)
+        tabela = drop.free_case_table(baratas, rara, rules.FREE_CASE_RARE_CHANCE)
+        self.assertEqual(sum(c for _s, c in tabela), Decimal("1"))
+        self.assertEqual(dict((s.id, c) for s, c in tabela)[99], Decimal("0.05"))
+        self.assertEqual(len(drop.free_case_table(baratas, None, rules.FREE_CASE_RARE_CHANCE)), 8)
+        with self.assertRaises(ValueError):
+            drop.free_case_table([], rara, rules.FREE_CASE_RARE_CHANCE)
+
+    def test_sorteio_respeita_a_chance_da_rara(self):
+        rng = random.Random(11)
+        tabela = drop.free_case_table([skin(i, 1) for i in range(1, 9)], skin(99, 4), Decimal("0.05"))
+        n = 40_000
+        raras = sum(1 for _ in range(n) if drop.draw_from_table(tabela, rng)[0].id == 99)
+        self.assertAlmostEqual(raras / n, 0.05, delta=0.005)
+
+
 if __name__ == "__main__":
     unittest.main()

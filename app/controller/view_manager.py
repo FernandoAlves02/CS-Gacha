@@ -36,6 +36,10 @@ class ViewManager:
     def tem_tela(self, nome):
         return nome in self._telas
 
+    @property
+    def tela_atual(self):
+        return self._tela_atual
+
     def mudar_tela_base(self, nome):
         if nome not in self._telas:
             logger.warning("Tela '%s' não registrada.", nome)

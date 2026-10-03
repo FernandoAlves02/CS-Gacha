@@ -40,6 +40,7 @@ from panda3d.core import (
 from app.core.game_rules import WEARS, format_money
 from app.core.i18n import IDIOMAS, data, idioma, numero, t
 from app.core.paths import FONTS_DIR, item_image_path
+from app.view.sons import tocar_som
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +162,18 @@ def nome_em_duas_linhas(nome):
         arma, padrao = nome.split(" | ", 1)
         return arma, padrao
     return nome, ""
+
+
+def ampliar_area(botao, folga_x, z1=None, z2=None):
+    """Aumenta a ÁREA CLICÁVEL de um botão de texto sem mudar o desenho (Extras 5).
+
+    Mede o texto atual e soma uma folga dos lados; z1/z2 (opcionais) fixam a
+    altura da área (ex.: a altura toda do header). Chame de novo se o texto mudar.
+    """
+    botao["frameSize"] = None
+    botao.resetFrameSize()                      # mede o texto atual
+    x1, x2, base, topo = botao.guiItem.getFrame()
+    botao["frameSize"] = (x1 - folga_x, x2 + folga_x, base if z1 is None else z1, topo if z2 is None else z2)
 
 
 def formatar_variacao(variacao):
@@ -371,7 +384,8 @@ class KitUI:
 
     def botao_texto(self, pai, texto, x, z, escala, comando, extra=None, cor=COR_TEXTO_2,
                     cor_hover=COR_TEXTO, alinhar=CENTRO, negrito=True):
-        """Botão só de texto (abas, links, setas da paginação)."""
+        """Botão só de texto (abas, links, setas da paginação). A área clicável é
+        bem maior que as letras (folga dos lados, em cima e embaixo): fácil de acertar."""
         largura = self.largura_texto(texto, escala, negrito)
         if alinhar == CENTRO:
             x1, x2 = -largura / 2, largura / 2
@@ -389,8 +403,8 @@ class KitUI:
             text3_fg=COR_TEXTO_3,
             text_align=alinhar,
             relief=DGG.FLAT,
-            frameColor=(0, 0, 0, 0),              # área clicável invisível um pouco maior que o texto
-            frameSize=(x1 - 0.02, x2 + 0.02, -escala * 0.45, escala * 1.05),
+            frameColor=(0, 0, 0, 0),              # área clicável invisível, maior que o texto
+            frameSize=(x1 - 0.03, x2 + 0.03, -escala * 0.9, escala * 1.6),
             pressEffect=0,
             pos=(x, 0, z),
             command=comando,
@@ -690,8 +704,11 @@ class Aviso:
         self.z = z
         self.caixa = None
 
-    def mostrar(self, mensagem, sucesso=True, segundos=3.5):
+    def mostrar(self, mensagem, sucesso=True, segundos=3.5, som=True):
+        """som=False: só a mensagem (ex.: avisos que não são resultado de uma ação)."""
         self.esconder()
+        if som:
+            tocar_som(self.kit.app, "sucesso" if sucesso else "erro")
         escala = 0.034
         largura = min(self.kit.largura_texto(mensagem, escala) + 0.10, 3.2)
         cor = COR_VERDE if sucesso else COR_VERMELHO
@@ -713,10 +730,11 @@ class Aviso:
             self.caixa = None
 
 
-def abrir_janela_conteudo(kit, pai, nome_caixa, tabela, ao_fechar):
+def abrir_janela_conteudo(kit, pai, nome_caixa, tabela, ao_fechar, rodape=None):
     """Janela com TODOS os itens de uma caixa e a chance de cada um (usada no
     Mercado e no Inventário). tabela: [(Skin_Catalog, chance)] do drop_table.
-    ao_fechar: função do botão FECHAR (a tela fecha a janela)."""
+    ao_fechar: função do botão FECHAR (a tela fecha a janela).
+    rodape: explicação das chances (None = a regra das caixas normais)."""
     janela = Janela(kit, pai, 3.2, 1.72, t("CONTEÚDO  ·  {caixa}", caixa=limpar_nome(nome_caixa)))
     colunas, linhas = 8, 3
     por_pagina = colunas * linhas
@@ -751,8 +769,9 @@ def abrir_janela_conteudo(kit, pai, nome_caixa, tabela, ao_fechar):
             desenhar()
 
     desenhar()
-    kit.texto(janela.painel, t("Chance de cada item = chance da raridade ÷ quantidade de itens dessa raridade."),
-              -1.52, -0.75, 0.025, COR_TEXTO_3)
+    if rodape is None:
+        rodape = t("Chance de cada item = chance da raridade ÷ quantidade de itens dessa raridade.")
+    kit.texto(janela.painel, rodape, -1.52, -0.75, 0.025, COR_TEXTO_3)
     kit.botao(janela.painel, t("FECHAR"), 1.32, -0.74, 0.40, 0.085, ao_fechar, tipo="secundario", escala=0.03)
     return janela
 

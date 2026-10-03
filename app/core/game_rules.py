@@ -15,7 +15,7 @@ escolhido (app/core/i18n.py); os valores guardados no banco não mudam.
 from datetime import timedelta
 from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 
-from app.core import i18n
+from app.core import i18n, preferencias
 
 CENT = Decimal("0.01")                 # precisão do dinheiro (2 casas)
 FLOAT_STEP = Decimal("0.000000001")    # precisão do float (9 casas, coluna DECIMAL(11,9))
@@ -33,9 +33,9 @@ INVENTORY_LIMIT = 1000
 
 CURRENCY_SYMBOL = "R$"
 
-# Em inglês os valores aparecem em dólar, convertidos por esta cotação.
-# O banco continua em reais: só a EXIBIÇÃO muda. Ajuste quando quiser
-# (dólar comercial de 01/10/2026: R$ 5,22).
+# Em inglês os valores aparecem em dólar, convertidos por esta cotação (nas
+# CONFIGURAÇÕES dá para fixar R$ ou US$ em qualquer idioma). O banco continua
+# em reais: só a EXIBIÇÃO muda. Ajuste quando quiser (dólar comercial de 01/10/2026: R$ 5,22).
 CURRENCY_SYMBOL_USD = "US$"
 BRL_PER_USD = Decimal("5.22")
 
@@ -47,6 +47,14 @@ KEY_PRICE = Decimal("13.50")
 # Taxa descontada na VENDA de uma skin (a Steam cobra cerca de 15%).
 # Ex.: skin de R$ 10,00 -> o jogador recebe R$ 8,50.
 SELL_FEE_RATE = Decimal("0.15")
+
+# CAIXA GRÁTIS (para quem ficou sem dinheiro): não precisa de chave, só aparece
+# quando o saldo NÃO paga a chave e libera no máximo 1 vez a cada 10 minutos.
+# Conteúdo: as skins mais baratas do catálogo + 1 skin rara de valor interessante.
+FREE_CASE_COOLDOWN = timedelta(minutes=10)
+FREE_CASE_RARE_CHANCE = Decimal("0.05")        # 5% para a rara; 95% divididos entre as baratas
+FREE_CASE_COMMON_COUNT = 8                     # quantas skins baratas entram na caixa
+FREE_CASE_RARE_MIN_PRICE = Decimal("50.00")    # a rara vale pelo menos isto em QUALQUER desgaste
 
 # ======================================================================
 # RARIDADES
@@ -154,15 +162,22 @@ def to_money(value):
 
 
 def format_money(value):
-    """Valor do banco (sempre em reais) pronto para a tela, no idioma atual.
-    pt: Decimal("1234.5") -> "R$ 1.234,50"
-    en: convertido pela cotação BRL_PER_USD -> "US$ 236.49"."""
+    """Valor do banco (sempre em reais) pronto para a tela, na moeda escolhida.
+    R$: Decimal("1234.5") -> "R$ 1.234,50"
+    US$: convertido pela cotação BRL_PER_USD -> "US$ 236.49".
+    (vírgula ou ponto seguem o idioma; a moeda segue as CONFIGURAÇÕES)"""
     return format_display(display_value(value))
 
 
+def usa_dolar():
+    """Moeda da tela: a escolhida nas CONFIGURAÇÕES; "Automática" segue o idioma (inglês = US$)."""
+    moeda = preferencias.obter("moeda")
+    return moeda == "USD" or (moeda == "auto" and i18n.idioma() == "en")
+
+
 def display_value(value):
-    """Valor do banco (em reais) na moeda da tela, com 2 casas (em inglês, já em dólar)."""
-    if i18n.idioma() == "en":
+    """Valor do banco (em reais) na moeda da tela, com 2 casas (em dólar, já convertido)."""
+    if usa_dolar():
         return to_money(Decimal(str(value)) / BRL_PER_USD)
     return to_money(value)
 
@@ -173,7 +188,7 @@ def format_display(amount):
     Serve para contas feitas com valores convertidos, para fecharem na tela:
     format_display(display_value(preco) * 4) -> 4 x US$ 1.45 = "US$ 5.80"
     (convertendo o total em reais daria US$ 5.79, por causa do arredondamento)."""
-    simbolo = CURRENCY_SYMBOL_USD if i18n.idioma() == "en" else CURRENCY_SYMBOL
+    simbolo = CURRENCY_SYMBOL_USD if usa_dolar() else CURRENCY_SYMBOL
     return f"{simbolo} {i18n.numero(to_money(amount))}"
 
 
@@ -298,3 +313,24 @@ def price_change(history, hours=24):
     variacao = (Decimal(str(ultimo_preco)) - ref_preco) / ref_preco * Decimal("100")
     horas = int(round((ultima_data - ref_data).total_seconds() / 3600))
     return variacao.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP), horas
+
+
+def free_case_wait(balance, last_free_case_at, now):
+    """Regra da caixa grátis. Devolve:
+    - None: não vale para este jogador agora (o saldo ainda paga a chave);
+    - timedelta(0): pode abrir agora;
+    - timedelta > 0: quanto falta para liberar (1 a cada FREE_CASE_COOLDOWN).
+    Ex.: saldo R$ 5,00, última há 3 min -> faltam 7 min."""
+    if Decimal(str(balance)) >= KEY_PRICE:
+        return None
+    if last_free_case_at is None:
+        return timedelta(0)
+    falta = last_free_case_at + FREE_CASE_COOLDOWN - now
+    # min(): se o relógio do PC voltar no tempo, a espera nunca passa de 10 min
+    return min(FREE_CASE_COOLDOWN, max(timedelta(0), falta))
+
+
+def format_wait(espera):
+    """Tempo de espera em minutos:segundos. Ex.: timedelta(minutes=7, seconds=5) -> "07:05"."""
+    segundos = max(0, int(espera.total_seconds() + 0.999))    # arredonda para cima: nunca mostra 00:00 antes da hora
+    return f"{segundos // 60:02d}:{segundos % 60:02d}"

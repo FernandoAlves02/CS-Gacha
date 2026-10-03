@@ -11,3 +11,5 @@ __pycache__/
 app/assets/maps/de_mirage_d.glb
 # cópia local das respostas da API (gerada pelo importador)
 tools/cache/
+# sons originais baixados (o jogo usa as cópias em app/assets/sounds)
+app/assets/_sounds/

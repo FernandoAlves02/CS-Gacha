@@ -159,6 +159,9 @@ TEXTOS_EN = {
         "Could not open the case. Check the database connection.",
     "Não foi possível calcular o valor de venda.": "Could not calculate the sale value.",
     "Não foi possível concluir a venda.": "Could not complete the sale.",
+    "Não foi possível salvar a skin em destaque.": "Could not save the featured skin.",
+    "A Home volta a mostrar a sua skin mais valiosa.": "The Home goes back to showing your most valuable skin.",
+    "Skin em destaque na Home!": "Skin featured on the Home!",
 
     # ------------------------------------------------------------------
     # Abertura de caixa
@@ -177,6 +180,63 @@ TEXTOS_EN = {
     "VER DETALHES": "SEE DETAILS",
     "ABRIR OUTRA  ({n})": "OPEN ANOTHER  ({n})",
     "ACEITAR": "ACCEPT",
+
+    # ------------------------------------------------------------------
+    # Home viva e caixa grátis (Extras 4)
+    # ------------------------------------------------------------------
+    "SUAS ESTATÍSTICAS": "YOUR STATS",
+    "Caixas abertas": "Cases opened",
+    "{n} ({gratis} grátis)": "{n} ({gratis} free)",
+    "Gasto no mercado": "Spent in the market",
+    "Recebido em vendas": "Earned from sales",
+    "Valor movimentado": "Total moved",
+    "Itens no inventário": "Items in inventory",
+    "MELHOR DROP": "BEST DROP",
+    "Abra uma caixa para aparecer aqui.": "Open a case to show up here.",
+    "Caixas abertas por todos os jogadores: {n}": "Cases opened by all players: {n}",
+    "Estatísticas indisponíveis no momento.": "Stats unavailable right now.",
+    "SKIN EM DESTAQUE": "FEATURED SKIN",
+    "SUA SKIN MAIS VALIOSA": "YOUR MOST VALUABLE SKIN",
+    "Abra uma caixa: sua melhor skin aparece aqui.": "Open a case: your best skin shows up here.",
+    "H: modo wallpaper (esconde o menu)": "H: wallpaper mode (hides the menu)",
+    "Modo wallpaper: aperte H ou ESC para voltar.": "Wallpaper mode: press H or ESC to go back.",
+    "CAIXA GRÁTIS PRONTA": "FREE CASE READY",
+    "Próxima caixa grátis em {tempo}": "Next free case in {tempo}",
+    "Caixa Grátis": "Free Case",
+    "Caixa grátis: o item raro tem {chance} de chance; os outros dividem o resto igualmente.":
+        "Free case: the rare item has a {chance} chance; the others share the rest evenly.",
+    "GRÁTIS": "FREE",
+    "Pronta para abrir!": "Ready to open!",
+    "Libera em {tempo}": "Unlocks in {tempo}",
+    "ABRIR GRÁTIS": "OPEN FOR FREE",
+    "Sem chave · 1 grátis a cada 10 minutos": "No key · 1 free every 10 minutes",
+    "NA HOME": "ON HOME",
+    "DESTACAR NA HOME": "FEATURE ON HOME",
+    "TIRAR DA HOME": "REMOVE FROM HOME",
+    "Saldo insuficiente. Sem dinheiro? Abra a CAIXA GRÁTIS no INVENTÁRIO.":
+        "Insufficient balance. Out of money? Open the FREE CASE in the INVENTORY.",
+
+    # ------------------------------------------------------------------
+    # Configurações (Extras 5)
+    # ------------------------------------------------------------------
+    "CONFIGURAÇÕES": "SETTINGS",
+    "CONTA": "ACCOUNT",
+    "IDIOMA": "LANGUAGE",
+    "MOEDA": "CURRENCY",
+    "AUTOMÁTICA": "AUTOMATIC",
+    "Automática: R$ em português e US$ em inglês (US$ 1 = {cotacao}).":
+        "Automatic: R$ in Portuguese and US$ in English (US$ 1 = {cotacao}).",
+    "TELA": "DISPLAY",
+    "JANELA": "WINDOW",
+    "TELA CHEIA": "FULLSCREEN",
+    "Atalho: F11": "Shortcut: F11",
+    "EFEITOS SONOROS": "SOUND EFFECTS",
+    "MÚSICA": "MUSIC",
+    "Sem som": "Muted",
+    "ANIMAÇÕES DA HOME": "HOME ANIMATIONS",
+    "LIGADAS": "ON",
+    "DESLIGADAS": "OFF",
+    "Sons: Kenney (CC0)  ·  Música: Alex McCulloch (CC0)": "Sounds: Kenney (CC0)  ·  Music: Alex McCulloch (CC0)",
 
     # ------------------------------------------------------------------
     # Regras do banco (mensagens dos DAOs e do sorteio)
@@ -206,4 +266,7 @@ TEXTOS_EN = {
     "Este item não tem desgaste.": "This item has no wear.",
     "Esta skin não existe em {desgaste}.": "This skin does not exist in {desgaste}.",
     "Desgaste desconhecido: {desgaste}": "Unknown wear: {desgaste}",
+    "A caixa grátis é só para quem não tem saldo para a chave ({preco}).":
+        "The free case is only for players who can't afford the key ({preco}).",
+    "A próxima caixa grátis libera em {tempo}.": "The next free case unlocks in {tempo}.",
 }

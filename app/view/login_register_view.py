@@ -36,7 +36,7 @@ from app.controller.user_controller import User_Controller
 from app.core import i18n
 from app.core.i18n import t
 from app.core.paths import UI_DIR
-from app.view.ui_kit import COR_SELECAO, KitUI, SelecionarTudo, fonte_inter
+from app.view.ui_kit import COR_SELECAO, KitUI, SelecionarTudo, ampliar_area, fonte_inter
 
 logger = logging.getLogger(__name__)
 
@@ -137,10 +137,6 @@ class LoginRegisterView:
         self.login_controller = Login_Controller(user_dao, self, self._ao_autenticar)
         self.user_controller = User_Controller(user_dao, self, self._ao_cadastrar)
 
-        # Fonte Inter na resolução certa para o tamanho dos textos desta tela
-        # (detalhes em ui_kit.fonte_inter). Sem o arquivo, usa a fonte padrão.
-        self.fonte = fonte_inter(self.app, negrito=False, escala=FONTE_CAMPO * PX)
-        self.fonte_bold = fonte_inter(self.app, negrito=True, escala=FONTE_BOTAO * PX)
         # Fonte Inter na resolução certa para o tamanho dos textos desta tela
         # (detalhes em ui_kit.fonte_inter). Sem o arquivo, usa a fonte padrão.
         self.fonte = fonte_inter(self.app, negrito=False, escala=FONTE_CAMPO * PX)
@@ -408,7 +404,7 @@ class LoginRegisterView:
 
         self.btn_link["text"] = f"{texto_link}\1cs_destaque\1{texto_destaque}\2"
         self.btn_link.setPos(0, 0, _z(layout["link"]))
-        self.btn_link.resetFrameSize()    # área clicável acompanha o novo texto
+        ampliar_area(self.btn_link, 20 * PX, -12 * PX, 24 * PX)   # área clicável maior que as letras
 
         self.msg.setPos(0, _z(layout["msg"]))
         self.msg.setText("")

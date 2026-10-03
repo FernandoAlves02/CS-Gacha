@@ -10,21 +10,29 @@ O que a documentação pede e onde está aqui
 - abrir caixa com animação; resultado vem pronto do backend
                                                   ... case_opening.AberturaDeCaixa
 - contador "37 / 1000" (limite do inventário do CS)
+- (Extras 4) CAIXA GRÁTIS no começo da grade quando o saldo não paga a chave,
+  e "DESTACAR NA HOME" no menu da skin (pedestal da Home)
 
 Layout (16:9): título + filtros TUDO / CAIXAS / SKINS em cima, grade de 7 x 3
 cartões, paginação embaixo.
 """
+from datetime import datetime, timedelta
+from types import SimpleNamespace
+
 from direct.showbase.DirectObject import DirectObject
 
 from app.controller.inventory_controller import Inventory_Controller
 from app.core.game_rules import (
+    FREE_CASE_RARE_CHANCE,
     SELL_FEE_RATE,
     display_value,
     format_display,
     format_money,
+    format_wait,
     rarity_label,
     wear_label_full,
 )
+from app.core.paths import UI_DIR
 from app.core.i18n import data, numero, t
 from app.view.case_opening import AberturaDeCaixa
 from app.view.game_view_base import GameViewBase
@@ -39,9 +47,11 @@ from app.view.ui_kit import (
     COR_VERMELHO,
     COR_VEU,
     DIREITA,
+    ESQUERDA,
     Aviso,
     Janela,
     abrir_janela_conteudo,
+    formatar_chance,
     limpar_nome,
     nome_em_duas_linhas,
 )
@@ -64,15 +74,11 @@ MENU_LARGURA, MENU_ALTURA = 0.46, 0.075
 COR_CAIXA = (0.62, 0.64, 0.68, 1)   # caixas não têm raridade: faixa cinza
 
 TASK_AVISO = "inventario_aviso"
+TASK_GRATIS = "inventario_caixa_gratis"     # contagem regressiva da caixa grátis (1 vez por segundo)
+IMAGEM_GRATIS = UI_DIR / "caixa_gratis.png"
 
 
 class InventoryView(GameViewBase):
-
-    ROTA = "inventory"
-
-    # ==================================================================
-    # CONSTRUÇÃO
-    # ==================================================================
 
     ROTA = "inventory"
 
@@ -84,7 +90,8 @@ class InventoryView(GameViewBase):
         vm = self.view_manager
         self.app = vm.app
         self.controller = Inventory_Controller(
-            vm.inventory_dao, vm.collection_dao, vm.rarity_dao, self, vm.usuario_logado
+            vm.inventory_dao, vm.collection_dao, vm.rarity_dao, self, vm.usuario_logado,
+            skin_catalog_dao=vm.skin_catalog_dao,
         )
 
         self.veu = self.ui.retangulo(self.ui_root, -4, 4, -1.5, 0.86, COR_VEU)
@@ -103,9 +110,12 @@ class InventoryView(GameViewBase):
 
         self.filtro = "TUDO"
         self.pagina = 0
-        self.itens = []                  # [("caixa", Collection) | ("skin", Skin_Instance)]
+        self.itens = []                  # [("gratis", None) | ("caixa", Collection) | ("skin", Skin_Instance)]
         self.cartoes = {}                # índice na lista -> cartão
         self.selecionado = None          # índice do item selecionado
+        self.gratis_libera_em = None     # caixa grátis: quando libera (None = não aparece)
+        self.lbl_gratis = None           # texto "Pronta para abrir!" / "Libera em 07:05"
+        self.destaque_id = None          # skin escolhida para o pedestal da Home
 
         self.eventos = DirectObject()
         self.eventos.accept("escape", self._tecla_esc)
@@ -122,6 +132,7 @@ class InventoryView(GameViewBase):
 
     def destruir(self):
         self.eventos.ignoreAll()
+        self.app.taskMgr.remove(TASK_GRATIS)
         if self.abertura is not None:
             self.abertura.destruir()
             self.abertura = None
@@ -145,13 +156,21 @@ class InventoryView(GameViewBase):
     def _carregar(self):
         """Busca os itens do jogador no banco e redesenha a tela."""
         caixas, skins = self.controller.load()
-        self.todos = [("caixa", c) for c in caixas] + [("skin", s) for s in skins]
+        self.destaque_id = self.controller.featured_skin_id()
+        # Caixa grátis: só aparece quando o saldo não paga a chave (pronta ou com contagem)
+        espera = self.controller.free_case_wait()
+        self.gratis_libera_em = None if espera is None else datetime.now() + espera
+        gratis = [("gratis", None)] if espera is not None else []
+        self.todos = gratis + [("caixa", c) for c in caixas] + [("skin", s) for s in skins]
         self.usados, self.limite = self.controller.status()
         self._aplicar_filtro()
+        self.app.taskMgr.remove(TASK_GRATIS)
+        if espera is not None and espera > timedelta(0):
+            self.app.taskMgr.doMethodLater(1.0, self._contar_gratis, TASK_GRATIS)
 
     def _aplicar_filtro(self):
         if self.filtro == "CAIXAS":
-            self.itens = [item for item in self.todos if item[0] == "caixa"]
+            self.itens = [item for item in self.todos if item[0] in ("gratis", "caixa")]
         elif self.filtro == "SKINS":
             self.itens = [item for item in self.todos if item[0] == "skin"]
         else:
@@ -173,6 +192,7 @@ class InventoryView(GameViewBase):
     def _desenhar_grade(self):
         grade = self._recriar("area_grade")
         self._fechar_menu()
+        self.lbl_gratis = None                 # o cartão da caixa grátis (se estiver na página) recria
         ui = self.ui
         if not self.itens:
             vazio = {"CAIXAS": t("Você não tem caixas."), "SKINS": t("Você ainda não tem skins.")}
@@ -191,7 +211,9 @@ class InventoryView(GameViewBase):
             x = GRADE_X1 + largura / 2 + (n % COLUNAS) * (largura + ESPACO)
             z = GRADE_TOPO - altura / 2 - (n // COLUNAS) * (altura + ESPACO)
             indice = inicio + n
-            if tipo == "caixa":
+            if tipo == "gratis":
+                cartao = self._cartao_gratis(grade, x, z, largura, altura, indice)
+            elif tipo == "caixa":
                 cartao = self._cartao_caixa(grade, x, z, largura, altura, item, indice)
             else:
                 cartao = self._cartao_skin(grade, x, z, largura, altura, item, indice)
@@ -212,6 +234,47 @@ class InventoryView(GameViewBase):
             ui.selo(cartao, f"x{caixa.quantity}", largura / 2 - 0.015, altura / 2 - 0.015, 0.028)
         return cartao
 
+    def _cartao_gratis(self, pai, x, z, largura, altura, indice):
+        """Cartão da CAIXA GRÁTIS: faixa verde, selo GRÁTIS e "pronta" ou a contagem."""
+        ui = self.ui
+        cartao = ui.cartao(pai, x, z, largura, altura, self._selecionar, [indice], cor_raridade=COR_VERDE)
+        ui.imagem(cartao, ui.textura(IMAGEM_GRATIS), 0, altura / 2 - 0.14, largura - 0.08, 0.25)
+        ui.selo(cartao, t("GRÁTIS"), largura / 2 - 0.015, altura / 2 - 0.015, 0.024, cor=COR_VERDE)
+        esq = -largura / 2 + 0.03
+        ui.texto(cartao, t("Caixa"), esq, -0.085, 0.024, COR_TEXTO_2)
+        ui.texto(cartao, t("Caixa Grátis"), esq, -0.13, 0.031, COR_TEXTO, largura_max=largura - 0.06)
+        self.lbl_gratis = ui.texto(cartao, "", esq, -0.172, 0.022, COR_VERDE, ESQUERDA)
+        self._atualizar_texto_gratis()
+        return cartao
+
+    def _espera_gratis(self):
+        """Quanto falta para a caixa grátis liberar (timedelta(0) = pronta)."""
+        return max(timedelta(0), self.gratis_libera_em - datetime.now())
+
+    def _atualizar_texto_gratis(self):
+        if self.lbl_gratis is None or self.lbl_gratis.isEmpty():
+            return
+        espera = self._espera_gratis()
+        if espera <= timedelta(0):
+            self.lbl_gratis.setText(t("Pronta para abrir!"))
+            self.lbl_gratis.setFg(COR_VERDE)
+        else:
+            self.lbl_gratis.setText(t("Libera em {tempo}", tempo=format_wait(espera)))
+            self.lbl_gratis.setFg(COR_TEXTO_3)
+
+    def _contar_gratis(self, task):
+        """Atualiza a contagem a cada segundo; quando libera, o botão ABRIR GRÁTIS fica ativo."""
+        self._atualizar_texto_gratis()
+        if self._espera_gratis() > timedelta(0):
+            return task.again
+        # habilita o ABRIR GRÁTIS, se o menu da caixa grátis estiver à mostra (e nada aberto por cima)
+        indice = self.selecionado
+        cartao = self.cartoes.get(indice)
+        if (cartao is not None and self.area_menu is not None and not self._janela_aberta()
+                and not self._abertura_ativa() and self.itens[indice][0] == "gratis"):
+            self._mostrar_menu(indice, cartao)
+        return task.done
+
     def _cartao_skin(self, pai, x, z, largura, altura, skin_instancia, indice):
         ui = self.ui
         skin = skin_instancia.skin
@@ -224,6 +287,8 @@ class InventoryView(GameViewBase):
         ui.texto(cartao, arma, esq, -0.085, 0.024, COR_TEXTO_2, largura_max=largura - 0.06)
         ui.texto(cartao, padrao or "Vanilla", esq, -0.13, 0.031, COR_TEXTO, largura_max=largura - 0.06)
         ui.texto(cartao, skin_instancia.wear_label, esq, -0.172, 0.022, COR_TEXTO_3, largura_max=largura - 0.06)
+        if skin_instancia.id == self.destaque_id:
+            ui.selo(cartao, t("NA HOME"), largura / 2 - 0.015, altura / 2 - 0.015, 0.022, cor=COR_LARANJA)
         return cartao
 
     # ==================================================================
@@ -255,14 +320,21 @@ class InventoryView(GameViewBase):
     def _mostrar_menu(self, indice, cartao):
         menu = self._recriar("area_menu")
         tipo, item = self.itens[indice]
-        if tipo == "caixa":
+        if tipo == "gratis":
+            pronta = self._espera_gratis() <= timedelta(0)
+            acoes = [(t("ABRIR GRÁTIS"), self._abrir_gratis, [], "primario", pronta),
+                     (t("VER CONTEÚDO"), self._ver_conteudo_gratis, [], "secundario")]
+        elif tipo == "caixa":
             acoes = [(t("ABRIR CAIXA"), self._abrir_caixa, [item], "primario"),
                      (t("VER CONTEÚDO"), self._ver_conteudo, [item], "secundario")]
         else:
             cotacao = self.controller.sale_quote(item.id)
             texto_venda = t("VENDER  ·  {valor}", valor=format_money(cotacao[1])) if cotacao else t("VENDER")
+            na_home = item.id == self.destaque_id
             acoes = [(t("DETALHES"), self._abrir_detalhes, [item], "primario"),
-                     (texto_venda, self._vender, [item], "secundario")]
+                     (texto_venda, self._vender, [item], "secundario"),
+                     (t("TIRAR DA HOME") if na_home else t("DESTACAR NA HOME"), self._destacar,
+                      [None if na_home else item.id], "secundario")]
 
         # Menu ao lado direito do cartão (ou à esquerda, se não couber)
         largura, altura = self.tamanho_cartao
@@ -272,9 +344,9 @@ class InventoryView(GameViewBase):
         if x + MENU_LARGURA / 2 > GRADE_X2 + 0.05:
             x = x_cartao - meia - 0.02 - MENU_LARGURA / 2
         z = z_cartao + altura / 2 * AUMENTO_SELECIONADO - MENU_ALTURA / 2
-        for texto, comando, extra, tipo_botao in acoes:
+        for texto, comando, extra, tipo_botao, *ativo in acoes:
             self.ui.botao(menu, texto, x, z, MENU_LARGURA, MENU_ALTURA, comando, extra, tipo=tipo_botao,
-                          escala=0.028)
+                          escala=0.028, ativo=ativo[0] if ativo else True)
             z -= MENU_ALTURA + 0.012
 
     def _fechar_menu(self):
@@ -397,6 +469,38 @@ class InventoryView(GameViewBase):
             ao_ver_detalhes=lambda instancia: self._abrir_detalhes(instancia, permitir_venda=False),
             ao_mudar_saldo=self.atualizar_saldo,
         )
+
+    def _abrir_gratis(self):
+        """CAIXA GRÁTIS: monta o conteúdo com os preços de agora e abre a roleta (sem chave)."""
+        tabela = self.controller.free_case_contents()
+        if not tabela:
+            return                              # o controller já mostrou o motivo
+        self._fechar_menu()
+        self.aviso.esconder()
+        caixa = SimpleNamespace(id=None, name=t("Caixa Grátis"), quantity=1)
+        self.abertura = AberturaDeCaixa(
+            self.ui, self.raiz, self.controller, caixa, tabela,
+            ao_sair=self._ao_sair_da_abertura,
+            ao_ver_detalhes=lambda instancia: self._abrir_detalhes(instancia, permitir_venda=False),
+            ao_mudar_saldo=self.atualizar_saldo,
+            gratis=True,
+        )
+
+    def _ver_conteudo_gratis(self):
+        tabela = self.controller.free_case_contents()
+        if tabela:
+            self._fechar_janela()
+            self.janela = abrir_janela_conteudo(
+                self.ui, self.raiz, t("Caixa Grátis"), tabela, self._fechar_janela,
+                rodape=t("Caixa grátis: o item raro tem {chance} de chance; os outros dividem o resto igualmente.",
+                         chance=formatar_chance(FREE_CASE_RARE_CHANCE)),
+            )
+            self.acao_enter = (self._fechar_janela, [])
+
+    def _destacar(self, skin_instance_id):
+        """DESTACAR NA HOME / TIRAR DA HOME (pedestal da Home)."""
+        if self.controller.set_featured(skin_instance_id):
+            self._carregar()
 
     def _ao_sair_da_abertura(self):
         self.abertura = None

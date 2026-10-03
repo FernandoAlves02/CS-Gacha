@@ -17,6 +17,8 @@
 --     price_history (histórico de preços a cada atualização da API).
 --  4. api_id / market_name: ligam nossos registros aos da API e do mercado.
 --  5. CHECK de saldo >= 0 e ON DELETE CASCADE nos itens do usuário.
+--  6. (Extras 4, migração 004) users.featured_skin_id e users.last_free_case_at,
+--     e a tabela user_transactions (estatísticas da Home).
 -- =====================================================================
 
 drop database if exists csgacha;
@@ -36,6 +38,8 @@ create table users(
 	password varchar(255) not null,
 	email varchar(100) not null unique,
 	balance decimal(10,2) not null default 0.00,
+	featured_skin_id int null,                    -- skin do pedestal da Home (null = a mais valiosa)
+	last_free_case_at datetime null,              -- última caixa grátis aberta (1 a cada 10 min)
 	primary key (id),
 	-- o saldo nunca pode ficar negativo (a regra também está no código)
 	constraint chk_users_balance check (balance >= 0)
@@ -160,4 +164,24 @@ create table skins_instance(
 	key idx_si_user (user_id),
 	constraint fk_user_skin_instance foreign key(user_id) references users(id) on delete cascade,
 	constraint fk_skin_catalog_skin_instance foreign key(skin_catalog_id) references skins_catalog(id)
+) engine=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- MOVIMENTAÇÕES (Extras 4): uma linha por compra, abertura e venda.
+-- É daí que saem as estatísticas da Home (caixas abertas, valores
+-- movimentados, melhor drop). Gravada na MESMA transação da operação.
+-- ---------------------------------------------------------------------
+create table user_transactions(
+	id int not null auto_increment,
+	user_id int not null,
+	kind varchar(20) not null,                    -- buy_case | buy_skin | open_case | free_case | sell_skin
+	quantity int not null default 1,
+	amount decimal(10,2) not null default 0.00,   -- dinheiro movimentado (sempre positivo)
+	skin_catalog_id int null,                     -- skin obtida (abertura/compra) ou vendida
+	item_value decimal(10,2) null,                -- valor dessa skin no momento
+	created_at datetime not null default current_timestamp,
+	primary key (id),
+	key idx_tr_user (user_id, kind),
+	constraint fk_user_transactions foreign key(user_id) references users(id) on delete cascade,
+	constraint fk_skin_transactions foreign key(skin_catalog_id) references skins_catalog(id)
 ) engine=InnoDB;

@@ -11,6 +11,7 @@ O que ele faz:
   2. testa compra de caixa, abertura (chave, float, conteúdo), venda,
      compra de skin avulsa, saldo insuficiente, caixa inexistente e
      inventário cheio (1000 itens);
+     (Extras 4) caixa grátis, skin em destaque e as estatísticas da Home;
   3. mostra a estatística de 10.000 sorteios simulados (sem gravar nada),
      comparando com as chances oficiais (bom para a apresentação);
   4. APAGA o usuário temporário e tudo dele no final (mesmo se algo falhar).
@@ -20,6 +21,7 @@ import random
 import sys
 import time
 from collections import Counter
+from datetime import timedelta
 from decimal import Decimal
 
 from app.controller.inventory_controller import Inventory_Controller
@@ -131,13 +133,17 @@ def main():
     try:
         view = ConsoleView()
         market = Market_Controller(collection_dao, skin_dao, inventory_dao, view, usuario)
-        inventario = Inventory_Controller(inventory_dao, collection_dao, rarity_dao, view, usuario)
+        inventario = Inventory_Controller(inventory_dao, collection_dao, rarity_dao, view, usuario,
+                                          skin_catalog_dao=skin_dao)
+        gasto = Decimal("0.00")           # para conferir as estatísticas da Home (Extras 4)
+        recebido = Decimal("0.00")
         caixa = min(caixas, key=lambda c: c.price)   # a mais barata
         print(f"  caixa usada nos testes: {caixa.name} ({rules.format_money(caixa.price)})")
 
         print("\n== Comprar caixa")
         check(market.check_purchase(caixa.price) is None, "checagem antes da compra libera")
         check(market.buy_case(caixa), "compra concluída")
+        gasto += caixa.price
         esperado = SALDO_TESTE - caixa.price
         check(usuario.balance == esperado == saldo_no_banco(database, usuario.id),
               f"saldo descontado na sessão e no banco ({rules.format_money(esperado)})")
@@ -155,6 +161,7 @@ def main():
             check(dentro, "float dentro do intervalo da skin")
             check(resultado.remaining_cases == 0 and not resultado.can_open_another, "caixa consumida (restam 0)")
             esperado -= rules.KEY_PRICE
+            gasto += rules.KEY_PRICE
             check(usuario.balance == esperado == saldo_no_banco(database, usuario.id),
                   f"chave cobrada ({rules.format_money(rules.KEY_PRICE)})")
             check(inventory_dao.get_cases(usuario.id) == [] and len(inventory_dao.get_skins(usuario.id)) == 1,
@@ -165,6 +172,7 @@ def main():
             check(recebe == rules.sell_payout(preco), f"valor final mostrado antes ({rules.format_money(recebe)})")
             pago = inventario.sell_skin(s.id)
             esperado += recebe
+            recebido += recebe
             check(pago == recebe and usuario.balance == esperado == saldo_no_banco(database, usuario.id),
                   "saldo creditado (preço - taxa)")
             check(inventory_dao.get_skins(usuario.id) == [], "skin saiu do inventário")
@@ -184,6 +192,7 @@ def main():
                 check(rules.wear_from_float(nova.float_value, skin.has_wear) == anuncio.wear,
                       "float gerado combina com o desgaste comprado")
                 esperado -= anuncio.price
+                gasto += anuncio.price
                 check(usuario.balance == esperado == saldo_no_banco(database, usuario.id), "saldo descontado")
 
         print("\n== Saldo insuficiente")
@@ -197,6 +206,27 @@ def main():
         if rules.KEY_PRICE > 0:
             check(inventario.open_case(caixa.id) is None and "chave" in view.last[0], "sem saldo para a chave: não abre")
             check(len(inventory_dao.get_cases(usuario.id)) == 1, "caixa NÃO foi consumida")
+
+        print("\n== Extras 4: caixa grátis, skin em destaque e estatísticas da Home")
+        check(inventario.free_case_wait() == timedelta(0), "sem saldo para a chave: caixa grátis liberada")
+        tabela = inventario.free_case_contents()
+        soma = sum(chance for _skin, chance in tabela)
+        check(len(tabela) >= 2 and abs(soma - 1) < Decimal("0.000001"),
+              f"conteúdo da caixa grátis: {len(tabela)} itens, chances somam 100%")
+        gratis = inventario.open_free_case(tabela)
+        if check(gratis is not None, "caixa grátis aberta"):
+            g = gratis.skin_instance
+            print(f"        drop: {g.name} | {g.wear_label} | {rules.format_money(g.skin_price)}")
+            check(saldo_no_banco(database, usuario.id) == Decimal("0.01"), "não cobrou nada")
+            check(inventario.open_free_case(tabela) is None and "libera em" in view.last[0],
+                  "a próxima só daqui a 10 minutos")
+            check(inventario.set_featured(g.id) and inventory_dao.get_featured_skin(usuario.id)[0].id == g.id,
+                  "skin em destaque na Home")
+        stats = inventory_dao.get_stats(usuario.id)
+        check(stats.cases_opened == 2 and stats.free_cases_opened == 1,
+              f"estatística: 2 caixas abertas, 1 grátis ({stats.cases_opened}, {stats.free_cases_opened})")
+        check(stats.spent == gasto and stats.earned == recebido,
+              f"estatística: gasto {rules.format_money(stats.spent)} e recebido {rules.format_money(stats.earned)}")
 
         print("\n== Inventário cheio (1000 itens)")
         sql(database, "UPDATE users SET balance = %s WHERE id = %s", (SALDO_TESTE, usuario.id))

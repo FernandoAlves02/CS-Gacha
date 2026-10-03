@@ -35,15 +35,12 @@ class Market_Controller:
 
     def __init__(self, collection_dao, skin_catalog_dao, inventory_dao, view, user, rng=random,
                  rarity_dao=None):
-    def __init__(self, collection_dao, skin_catalog_dao, inventory_dao, view, user, rng=random,
-                 rarity_dao=None):
         self.collection_dao = collection_dao
         self.skin_catalog_dao = skin_catalog_dao
         self.inventory_dao = inventory_dao
         self.view = view
         self.user = user
         self.rng = rng          # nos testes passamos random.Random(semente)
-        self.rarity_dao = rarity_dao    # só para os filtros de raridade da aba SKINS
         self.rarity_dao = rarity_dao    # só para os filtros de raridade da aba SKINS
 
     # ----------------------------------------------------------
@@ -105,26 +102,6 @@ class Market_Controller:
             logger.exception("Falha ao carregar preços")
             self.view.show_message(t("Não foi possível carregar os preços."), False)
             return []
-
-    def price_changes(self, listings):
-        """Variação recente (▲▼) de cada anúncio da página.
-
-        listings: o que list_skins devolveu [(Skin_Catalog, Market_Price)].
-        Devolve {(skin_id, desgaste): (variação em %, horas)}; anúncio sem
-        histórico suficiente fica de fora. Falha aqui não atrapalha a tela.
-        """
-        try:
-            pares = [(skin.id, preco.wear) for skin, preco in listings]
-            historico = self.skin_catalog_dao.get_history_for_listings(pares)
-        except Exception:
-            logger.exception("Falha ao carregar a variação dos preços")
-            return {}
-        variacoes = {}
-        for par, pontos in historico.items():
-            variacao = price_change(pontos)
-            if variacao is not None:
-                variacoes[par] = variacao
-        return variacoes
 
     def price_changes(self, listings):
         """Variação recente (▲▼) de cada anúncio da página.

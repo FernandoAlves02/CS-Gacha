@@ -128,6 +128,32 @@ def float_for_wear(min_float, max_float, wear, rng=random):
     return _clamp(Decimal(str(valor)), baixo, alto)
 
 
+def free_case_table(commons, rare, rare_chance):
+    """Tabela de drops da CAIXA GRÁTIS: [(skin, chance)], somando 1.
+
+    commons: skins baratas (dividem igualmente o que sobra da chance da rara);
+    rare: a skin rara (ou None, se o catálogo não tiver uma).
+    Ex.: 8 baratas + rara com 5% -> cada barata 11,875% e a rara 5%.
+    """
+    if not commons:
+        raise ValueError(t("Esta caixa não tem itens cadastrados. Rode o importador: python tools/sync_market.py"))
+    rare_chance = Decimal(str(rare_chance)) if rare is not None else Decimal("0")
+    cada = (Decimal("1") - rare_chance) / len(commons)
+    tabela = [(skin, cada) for skin in commons]
+    if rare is not None:
+        tabela.append((rare, rare_chance))
+    return tabela
+
+
+def draw_from_table(table, rng=random):
+    """Sorteia direto de uma tabela [(skin, chance)] (caixa grátis): devolve (skin, float, desgaste)."""
+    skins = [skin for skin, _chance in table]
+    pesos = [float(chance) for _skin, chance in table]
+    skin = rng.choices(skins, weights=pesos, k=1)[0]
+    valor = draw_float(skin.min_float, skin.max_float, rng)
+    return skin, valor, wear_from_float(valor, has_wear(skin.min_float, skin.max_float))
+
+
 def draw_drop(items, probabilities, rng=random):
     """Sorteio completo de uma abertura: devolve (skin, float, desgaste)."""
     skin = draw_skin(items, probabilities, rng)

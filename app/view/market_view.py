@@ -316,7 +316,7 @@ class MarketView(GameViewBase):
             return
         motivo = self.controller.check_purchase(caixa.price)
         if motivo:
-            self.show_message(motivo, False)
+            self.show_message(self._com_dica_gratis(motivo), False)
             return
         self._janela_compra(
             limpar_nome(caixa.name), None, caixa.api_id, caixa.price,
@@ -526,7 +526,7 @@ class MarketView(GameViewBase):
         skin, preco = self.sel_anuncio
         motivo = self.controller.check_purchase(preco.price)
         if motivo:
-            self.show_message(motivo, False)
+            self.show_message(self._com_dica_gratis(motivo), False)
             return
         self._janela_compra(
             limpar_nome(skin.name), wear_label(preco.wear), skin.api_id, preco.price,
@@ -610,6 +610,12 @@ class MarketView(GameViewBase):
     # ==================================================================
     # AJUDANTES
     # ==================================================================
+
+    def _com_dica_gratis(self, motivo):
+        """Sem saldo nem para a chave: lembra que a CAIXA GRÁTIS está no inventário."""
+        if motivo == t("Saldo insuficiente.") and self.view_manager.usuario_logado.balance < KEY_PRICE:
+            return t("Saldo insuficiente. Sem dinheiro? Abra a CAIXA GRÁTIS no INVENTÁRIO.")
+        return motivo
 
     def _cor_preco(self, preco):
         return COR_VERDE if self.controller.can_afford(preco) else COR_VERMELHO

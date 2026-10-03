@@ -99,6 +99,57 @@ class Skin_Catalog_DAO(Read_Only_DAO):
             self.disconnect(cursor, connection)
 
     # ----------------------------------------------------------
+    # CAIXA GRÁTIS
+    # ----------------------------------------------------------
+
+    def get_free_case_pool(self, common_count, rare_min_price):
+        """Conteúdo da CAIXA GRÁTIS, montado com os preços atuais: (baratas, rara).
+
+        baratas: as `common_count` skins cujo desgaste MAIS CARO é o mais barato
+                 do catálogo (assim qualquer desgaste que sair é barato);
+        rara:    a skin mais barata cujo desgaste MAIS BARATO vale pelo menos
+                 `rare_min_price` (qualquer desgaste que sair vale a pena).
+                 Se nenhuma chegar a esse valor, usa a mais cara que houver.
+        """
+        connection, cursor = self.connect(buffered=True)
+
+        try:
+            cursor.execute(
+                f"""
+                SELECT {SKIN_COLUMNS}
+                FROM skins_catalog s
+                JOIN rarities r ON r.id = s.rarity_id
+                JOIN (SELECT skin_catalog_id, MAX(price) AS maior
+                      FROM skin_prices GROUP BY skin_catalog_id) m ON m.skin_catalog_id = s.id
+                ORDER BY m.maior, s.id
+                LIMIT %s
+                """,
+                (common_count,)
+            )
+            baratas = [skin_from_row(data) for data in cursor.fetchall()]
+            ids_baratas = {skin.id for skin in baratas}
+
+            consulta_rara = f"""
+                SELECT {SKIN_COLUMNS}
+                FROM skins_catalog s
+                JOIN rarities r ON r.id = s.rarity_id
+                JOIN (SELECT skin_catalog_id, MIN(price) AS menor
+                      FROM skin_prices GROUP BY skin_catalog_id) m ON m.skin_catalog_id = s.id
+            """
+            cursor.execute(consulta_rara + " WHERE m.menor >= %s ORDER BY m.menor, s.id LIMIT 1", (rare_min_price,))
+            data = cursor.fetchone()
+            if data is None:
+                cursor.execute(consulta_rara + " ORDER BY m.menor DESC, s.id LIMIT 1")
+                data = cursor.fetchone()
+            rara = skin_from_row(data) if data else None
+            if rara is not None and rara.id in ids_baratas:
+                rara = None                              # catálogo minúsculo: não repete a mesma skin
+            return baratas, rara
+
+        finally:
+            self.disconnect(cursor, connection)
+
+    # ----------------------------------------------------------
     # PREÇOS
     # ----------------------------------------------------------
 

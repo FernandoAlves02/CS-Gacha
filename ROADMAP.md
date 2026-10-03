@@ -1,9 +1,8 @@
 # CS Gacha — Roadmap v2 e Tutorial de Integração (Fases 2 a 5)
-# CS Gacha — Roadmap v2 e Tutorial de Integração (Fases 2 a 5)
 
 > Atualizado em **02/10/2026**. Substitui o roadmap de 01/10.
 > Base: Documentação do Projeto, branch `refactoring` e as respostas às decisões D1–D12.
-> **Estado conferido em 02/10, 22h:** Fases 4 e 5 validadas por você e no GitHub (`570efa8`): **MVP completo**. Os **extras** (seção 2.4) são feitos a partir desse commit, em pacotes pequenos: tutoriais na seção 10, depois das Fases 4 e 5. **Entregues:** Extras 1 (catálogo completo), **Extras 2** (busca, Ctrl+A, skin maior, compra múltipla e "Minha conta", que fecha o item 0 da documentação) e **Extras 3** (português/inglês, com US$).
+> **Estado conferido em 02/10, 22h:** Fases 4 e 5 validadas por você e no GitHub (`570efa8`): **MVP completo**. Os **extras** (seção 2.4) são feitos a partir desse commit, em pacotes pequenos: tutoriais na seção 10, depois das Fases 4 e 5. **Entregues:** Extras 1 (catálogo completo), **Extras 2** (busca, Ctrl+A, skin maior, compra múltipla e "Minha conta", que fecha o item 0 da documentação), **Extras 3** (português/inglês, com US$), **Extras 4** (Home viva e caixa grátis; precisa da migração 004) e **Extras 5** (CONFIGURAÇÕES, tela cheia, sons e música, cliques maiores).
 > **Como usar:** siga as seções 7, 8 e 10 na ordem. Cada tarefa tem **Passos**, **Validação** (só marque `[x]` quando passar) e **Se der erro**. A seção 9 explica o código para você conseguir apresentar.
 
 ---
@@ -20,7 +19,6 @@
 8. [Tutorial — Fase 3 (backend do gacha + nova tela de login)](#8-tutorial--fase-3-backend-do-gacha--nova-tela-de-login)
 9. [Entendendo o código (para a apresentação)](#9-entendendo-o-código-para-a-apresentação)
 10. [Fases 4 a 7 (tutorial das Fases 4 e 5)](#10-fases-4-a-7)
-10. [Fases 4 a 7 (tutorial das Fases 4 e 5)](#10-fases-4-a-7)
 11. [Calendário](#11-calendário)
 12. [PC do professor](#12-pc-do-professor)
 13. [Riscos e plano B](#13-riscos-e-plano-b)
@@ -36,17 +34,16 @@
 | 0 | Refatoração, ambiente | ✅ concluída (01/10) |
 | 1 | Login e cadastro funcionando no banco | ✅ concluída (01/10) |
 | 2 | Catálogo real (caixas, skins, raridades, floats) e preços reais no banco | ✅ catálogo e imagens (02/10) · 🟦 preços reais pela Steam: T2.4 passo 3 |
-| 3 | Backend do gacha (sorteio, comprar, abrir, vender, inventário) + nova tela de login | ✅ validada no seu PC (02/10): testes, autoteste 31/31, login |
+| 3 | Backend do gacha (sorteio, comprar, abrir, vender, inventário) + nova tela de login | ✅ validada no seu PC (02/10): testes, autoteste 31/31, login (com o Extras 4 o autoteste passa a ter 39 verificações) |
 | 4 | Tela do Mercado (caixas e skins avulsas) | ✅ validada no seu PC e no GitHub (02/10, `570efa8`) |
 | 5 | Inventário real, abertura com roleta, venda, detalhes | ✅ validada no seu PC e no GitHub (02/10, `570efa8`) |
 | 6 | Home viva (animação), vitrine "equipar", Mirage otimizada | ✅ Mirage recortada e cenário carregando no login (correção 4, 02/10: T3.5) · ⏳ animação e vitrine (D12) |
-| Extras | Pedidos de 02/10 (seção 2.4) | 🟦 Extras 1, 2 e 3 entregues (seção 10) · ⏳ Extras 4 (Home viva, caixa grátis) |
+| Extras | Pedidos de 02 e 03/10 (seção 2.4) | 🟦 Extras 1 a 5 entregues (seção 10) |
 | 7 | Testes de aceite, documentação, apresentação | ⏳ |
 | — | Coletor de preços contínuo para o histórico (D10) | 🟦 **código pronto**: deixar rodando (T2.6) |
 
 **Como o código das Fases 2 e 3 foi validado antes de chegar até você:**
 
-- **Testes automáticos** (regras, sorteio, controllers, importador e login) passando: 67 nas Fases 2 e 3, 74 com as Fases 4 e 5.
 - **Testes automáticos** (regras, sorteio, controllers, importador e login) passando: 67 nas Fases 2 e 3, 74 com as Fases 4 e 5.
 - **Simulação de 200.000 aberturas:** cada raridade ficou a menos de 0,07 ponto percentual da chance oficial, e a distribuição de desgaste saiu em 3/24/33/24/16%.
 - **Fluxo completo dos DAOs** rodado num banco de conferência gerado a partir do `schema.sql`: comprar, abrir, vender, comprar skin, preço que mudou, saldo insuficiente, inventário em 1.000, skin de outro jogador, rollback sem consumir a caixa e conexões sempre fechadas. 45 de 45 verificações passaram.
@@ -58,14 +55,16 @@
 
 - **Extras 2 (busca, Ctrl+A, skin maior, compra múltipla e Minha conta):** mesmo processo, com o jogo real aberto aqui. **84 testes** automáticos, **23 de 23** verificações do Extras 2 e **27 de 27** do Ctrl+A com **teclas de verdade** passando pela caixa de texto do Panda3D (setas, Home, End, Delete, Backspace, TAB, clique). As 39 de ponta a ponta das Fases 4 e 5 continuam passando. Um revisor independente leu o código; os pontos que ele achou (o principal: seta/Home/End com o texto marcado apagavam tudo) foram corrigidos e ganharam teste.
 - **Extras 3 (português/inglês):** **97 testes** automáticos (13 novos; um deles lê o código e confere que **todo texto da tela tem tradução**, com os mesmos valores) e **35 de 35** verificações com o jogo real em inglês (login, cadastro, header, mercado, compra de 4 caixas, inventário, abertura, venda, Minha conta, volta ao português, troca de idioma 8 vezes sem sobrar nada, janela ultralarga). Todas as verificações em português continuam passando. Um revisor independente comparou o português antes e depois em 80.000 valores (dinheiro, chance, variação, float, data): **nenhuma diferença**. Os pontos que ele achou foram corrigidos.
+- **Extras 4 (Home viva e caixa grátis):** **107 testes** automáticos, **40 de 40** verificações com o jogo real (Home com estatísticas e pedestal, modo wallpaper com a tecla H de verdade, caixa grátis da contagem até a abertura, destaque na Home, inglês, nada sobrando depois de 12 trocas de tela), **27 de 27** no banco de conferência (regra dos 10 minutos, inventário cheio, recusas sem gravar nada, estatísticas, destaque de outro jogador) e o autoteste do banco real com **39 de 39**. Um revisor independente achou 1 problema de verdade (o menu da caixa grátis podia reaparecer por cima da roleta) e alguns menores; o bug e os menores que afetam o jogador foram corrigidos e ganharam teste. **O que eu não consigo ver daqui:** o pedestal por cima do mapa real com o PBR (passo 5 do tutorial).
+- **Extras 5 (CONFIGURAÇÕES, tela cheia, sons e cliques maiores):** **112 testes** automáticos e **32 de 32** verificações com o jogo real (cliques de verdade no alto do header, embaixo das abas e acima do link do login; cada opção das CONFIGURAÇÕES; F11; volumes; animações desligadas; os sons disparados em cada ação, contando os "tiques" da roleta). Todas as verificações dos Extras anteriores continuam passando. Um revisor independente conferiu áudio e tela cheia no código-fonte do Panda3D 1.10; os 2 problemas que ele achou (a busca do mercado continuava recebendo teclas com as CONFIGURAÇÕES abertas; F11 não atualizava o botão da janela aberta) foram corrigidos e ganharam teste. **O que eu não consigo ouvir nem ver daqui:** o som de verdade e a tela cheia no seu Windows (passos 3 e 5 do tutorial).
 
 ### 1.1 Próximos passos (na ordem)
 
 1. **Extras 1** (seção 10), se ainda não fez: migração 003, importação e coletor.
-2. **Extras 2** e **Extras 3** (seção 10): testes, checklist e commit de cada um. *Cada ZIP já contém os anteriores; extraia sempre na ordem 1 → 2 → 3.*
+2. **Extras 2**, **Extras 3** e **Extras 4** (seção 10): testes, checklist e commit de cada um. *Cada ZIP já contém os anteriores: extrair só o último vale pelos outros, mas os passos de banco (migrações 003 e 004) e os checklists de cada um continuam valendo.*
 3. Deixar o **coletor de preços** rodando (**T2.6**) no fim de semana.
+4. **Extras 5** (seção 10): testes, checklist e commit. *Ele também traz o Extras 4 (mas a migração 004 continua necessária).*
 
-> **O que eu NÃO consegui testar aqui:** a sua **placa de vídeo** (os prints daqui não têm o cenário 3D nem o PBR, e o renderizador por software deixa as imagens um pouco serrilhadas), o **MariaDB do XAMPP** e as **APIs reais**. Por isso cada fase tem o checklist visual no seu PC. Se algo falhar, copie a mensagem inteira e me mande.
 > **O que eu NÃO consegui testar aqui:** a sua **placa de vídeo** (os prints daqui não têm o cenário 3D nem o PBR, e o renderizador por software deixa as imagens um pouco serrilhadas), o **MariaDB do XAMPP** e as **APIs reais**. Por isso cada fase tem o checklist visual no seu PC. Se algo falhar, copie a mensagem inteira e me mande.
 
 ---
@@ -112,14 +111,18 @@ Cada regra de jogo é **uma constante** em `app/core/game_rules.py`. Para mudar,
 | 0 | *(da documentação)* Ver e editar os dados da conta | Clicar no nome no header abre "Minha conta" | 🟦 **Extras 2** (E2) |
 | 1 | Comprar várias caixas/skins de uma vez | Quantidade na janela de compra (1 a 50), numa transação só | 🟦 **Extras 2** (E2) |
 | 2 | Todas as caixas e skins | **As 42 caixas + as skins das coleções de mapa** (estas só no mercado, porque não saem de caixa). 3 raridades novas (Consumer, Industrial, Contraband) pela migração 003 | ✅ **Extras 1** (E1) |
-| 3 | Home viva | Janela flutuante com estatísticas (caixas abertas, valores movimentados...), skin em destaque num pedestal girando, câmera com leve movimento, tecla para esconder a interface (wallpaper) | Extras 4 |
+| 3 | Home viva | Janela flutuante com estatísticas (caixas abertas, valores movimentados...), skin em destaque num pedestal girando, câmera com leve movimento, tecla para esconder a interface (wallpaper) | 🟦 **Extras 4** (E4) |
 | 4 | Skin maior no mercado | Imagem maior no painel e clique para ampliar | 🟦 **Extras 2** (E2) |
 | 5 | Ctrl+A nos campos de texto | Ctrl+A marca tudo; a próxima tecla substitui e Backspace/Delete apagam | 🟦 **Extras 2** (E2) |
 | 6 | Busca melhor | Palavras em qualquer ordem ("ak inheritance", "ak-47 inheritance" e "ak47" acham a AK-47 \| Inheritance) | 🟦 **Extras 2** (E2) |
-| 7 | Caixa gratuita | Skins baratas + 1 rara, sem chave. Aparece quando o saldo não paga a chave (< R$ 13,50), no máximo 1 vez a cada 10 min | Extras 4 |
+| 7 | Caixa gratuita | Skins baratas + 1 rara (**5%**), sem chave. Aparece quando o saldo não paga a chave (< R$ 13,50), no máximo 1 vez a cada 10 min | 🟦 **Extras 4** (E4) |
 | 8 | Português e inglês | Troca de idioma no login e no header. Em inglês os valores aparecem em **US$**, convertidos por uma cotação definida em `game_rules.py` (o banco continua em R$) | 🟦 **Extras 3** (E3) |
 | 9 | Banco online | **Depois da apresentação** (decisão sua). Fazer do jeito seguro exige um servidor (API) entre o jogo e o banco | — |
 | 10 | Instalador .exe | **Depois da apresentação** (decisão sua). Viável com o `build_apps` do Panda3D | — |
+| 11 | *(03/10)* Cliques mais fáceis | A área clicável do menu do header vai da altura toda do header e um pouco para os lados; o mesmo nas abas, setas de página e links | 🟦 **Extras 5** (E5) |
+| 12 | *(03/10)* Configurações | **CONFIGURAÇÕES** no header, no lugar do PT \| EN (o login continua com PT \| EN). Dentro: Minha conta, idioma, **moeda** (Automática, que segue o idioma; R$; US$), sons e animações da Home. Fica salvo no PC, como o idioma | 🟦 **Extras 5** (E5) |
+| 13 | *(03/10)* Sons e música | Sons **CC0** (domínio público): [Interface Sounds, da Kenney](https://opengameart.org/content/interface-sounds) e [Main Menu Music (Loop)](https://opengameart.org/content/main-menu-music-loop). Liga/desliga e volume nas Configurações. Os sons da Valve ficaram de fora: a [política da Valve](https://developer.valvesoftware.com/wiki/Mod_Content_Usage) permite em fangame não comercial, mas num repositório público é zona cinzenta | 🟦 **Extras 5** (E5) |
+| 14 | *(03/10)* Tela cheia | JANELA / TELA CHEIA nas Configurações e atalho **F11**; a escolha fica salva no PC | 🟦 **Extras 5** (E5) |
 
 Ordem: 2 primeiro (para o coletor juntar histórico das caixas novas no fim de semana), depois 6, 5, 4, 1 e 0, depois 8 (antes dos itens 3 e 7, para eles já nascerem traduzidos), depois 3 e 7.
 
@@ -129,6 +132,7 @@ Ordem: 2 primeiro (para o coletor juntar histórico das caixas novas no fim de s
 
 - ⚠️ **Nunca mais rode o `schema.sql` no seu PC**: ele apaga o banco **e o histórico de preços** coletado. Mudanças no banco passam a vir como **migração incremental** (`app/migrations/003_....sql`, só `ALTER TABLE`/`CREATE TABLE`), que preserva os dados.
 - **Backup antes de qualquer migração** (cmd): `C:\xampp\mysql\bin\mysqldump -u root -p --databases csgacha > backup_csgacha.sql`.
+- **Antes de extrair um ZIP: `git pull`** (principalmente se você usou o outro PC). Se o `git pull` der **conflito**, não escolha "Accept Both" / "Aceitar ambos": me mande a lista de arquivos antes de resolver. *(Foi o que quebrou o merge `cab847b`; ver Extras 4.)*
 - **Ciclo de validação das telas:** eu não consigo abrir a janela do Panda3D aqui. Você roda e me manda print do que aparecer. *Opcional:* se no fim de semana você deixar o PC ligado com o app do Claude aberto e me der permissão de controle do computador, eu mesmo rodo o jogo e tiro os prints, o que acelera bastante os ajustes de tela.
 
 **Moeda:** reais (R$), porque a Steam devolve os preços em BRL (`currency=7`). Saldo inicial R$ 500,00 (como antes).
@@ -309,28 +313,6 @@ Entregue em **2 partes** (o arquivo único passava do limite de envio): `cs-gach
 | `requirements.txt` | ALTERADO | `panda3d-simplepbr` passa a ser instalado sempre: o `scene_backdrop.py` já usava, e sem ele o PC do professor mostraria o cenário com outra iluminação. |
 
 ---
-
-### 6.3 Fases 4 e 5 (02/10, noite): Mercado, Inventário, venda e abertura
-
-ZIP `cs-gacha-fases-4-5.zip`, feito a partir do seu commit `3d35974`.
-
-| Arquivo | Situação | O que é |
-|---|---|---|
-| `app/view/ui_kit.py` | NOVO | Peças de interface no estilo CS2 usadas pelas telas novas: cartão de item, botões, abas, paginação, caixa de busca, janela (pop-up), aviso que some sozinho, barra de desgaste e o **gráfico de preços** (com `LineSegs`, sem biblioteca nova) |
-| `app/view/market_view.py` | NOVO | **Mercado** (Fase 4): abas CAIXAS e SKINS, painel de detalhes, compra com confirmação, busca, filtros de raridade, páginas e ▲▼ de 24 h |
-| `app/view/inventory_view.py` | REESCRITO | **Inventário** (Fase 5): itens reais, contador "x / 1.000", destaque + menu do item, pop-up de DETALHES, VENDER com valor final e confirmação |
-| `app/view/case_opening.py` | NOVO | **Abertura de caixa** com a roleta (visual do protótipo do grupo, agora com as skins reais) |
-| `app/view/game_view_base.py` | ALTERADO | Header: "MERCADO" no lugar de "LOJA", fonte Inter, item da tela atual sublinhado de laranja, saldo em R$ e `atualizar_saldo()` |
-| `app/view/home_view.py` | ALTERADO | Só informa a rota (`ROTA = "home"`) para o header destacar |
-| `app/view/login_register_view.py` | ALTERADO | **Correção de um erro meu:** a fonte Inter nunca carregava (o `loadFont` do Panda3D só aceita o caminho como texto e eu passava um `Filename`), então o login usava a fonte padrão. Agora usa a Inter de verdade, como no mockup |
-| `app/controller/market_controller.py` | ALTERADO | + `price_changes()` (▲▼ da página inteira numa consulta) e `list_rarities()` (filtros) |
-| `app/controller/inventory_controller.py` | ALTERADO | + `case_contents()` (prévia e cartões da roleta) |
-| `app/dao/skin_catalog_dao.py` | ALTERADO | + `get_history_for_listings()`: últimos 60 pontos de cada anúncio da página (usa `ROW_NUMBER()`, do MariaDB 10.2+) |
-| `app/core/game_rules.py` | ALTERADO | + `price_change()`: variação do preço em 24 h |
-| `app/controller/view_manager.py` | ALTERADO | Guarda os DAOs que as telas novas usam |
-| `main.py` | ALTERADO | Cria os DAOs e registra a rota `"shop"` (MERCADO) |
-| `app/unit_tests/test_gacha_rules.py`, `test_gacha_controllers.py` | ALTERADOS | + 7 testes (74 no total) |
-| `ROADMAP.md` | ALTERADO | Este documento |
 
 ### 6.3 Fases 4 e 5 (02/10, noite): Mercado, Inventário, venda e abertura
 
@@ -540,7 +522,6 @@ from price_history h join collections c on c.id = h.collection_id group by c.nam
 python -m unittest app.unit_tests.test_user_flow app.unit_tests.test_gacha_rules app.unit_tests.test_gacha_controllers app.unit_tests.test_sync_market
 ```
 **Validação**
-- [ ] Termina com `Ran 74 tests` (eram 67 antes das Fases 4 e 5) e `OK`, sem nenhum traceback e sem `ResourceWarning` no meio.
 - [ ] Termina com `Ran 74 tests` (eram 67 antes das Fases 4 e 5) e `OK`, sem nenhum traceback e sem `ResourceWarning` no meio.
 
 > Até a correção 4 apareciam 3 avisos `ResourceWarning: Implicitly cleaning up <HTTPError ...>` no Python 3.14: o importador não fechava as respostas de erro da Steam (429, 500 e 403). Não era falha de teste, mas era conexão ficando aberta; a correção 5 fecha essas respostas e tem um teste para isso.
@@ -886,6 +867,136 @@ ZIP `cs-gacha-extras-3.zip`, feito a partir do seu commit `570efa8` (já traz os
 
 **Se der erro:** mande o print e o terminal inteiro.
 
+### Extras 4 — Home viva e caixa grátis (itens 3 e 7) · 30 min
+
+ZIP `cs-gacha-extras-4.zip`, feito a partir do **estado atual do GitHub** (`cab847b`). Já traz os Extras 1, 2 e 3. **Tem migração (004)** e **nenhuma biblioteca nova**.
+
+> ⚠️ **O GitHub está com o jogo quebrado, e este ZIP conserta.** O merge `cab847b` juntou duas versões de 7 arquivos, com linhas repetidas (`game_view_base.py`, `market_controller.py`, `inventory_controller.py`, `inventory_view.py`, `login_register_view.py`, `test_gacha_controllers.py` e este `ROADMAP.md`). Com ele, o `python main.py` para com `SyntaxError`. Aconteceu porque o commit dos Extras (`aafe49e`) foi feito numa cópia que ainda estava no `3d35974` (antes das Fases 4 e 5); no `git pull`, o conflito foi resolvido mantendo **as duas** versões. **Este ZIP traz os 7 arquivos certos:** é só extrair (passo 1). O banco não foi afetado. Para não repetir: regra nova na seção 2.2.
+
+| Arquivo | Situação | O que é |
+|---|---|---|
+| `app/migrations/004_home_caixa_gratis.sql` | NOVO | Tabela `user_transactions` (uma linha por compra, abertura e venda: é daí que saem as estatísticas) e as colunas `users.featured_skin_id` (skin do pedestal) e `users.last_free_case_at` (última caixa grátis). Não apaga nada; pode rodar de novo |
+| `app/migrations/schema.sql` | ALTERADO | O mesmo da 004, para bancos novos. **Não rode no seu PC** (regra 2.2) |
+| `app/dao/inventory_dao.py` | ALTERADO | Cada compra, abertura e venda grava a movimentação **na mesma transação**; `open_free_case`, skin em destaque e `get_stats` |
+| `app/dao/skin_catalog_dao.py` | ALTERADO | `get_free_case_pool`: as 8 skins mais baratas + 1 rara (vale pelo menos R$ 50 em qualquer desgaste), com os preços de agora |
+| `app/core/game_rules.py`, `app/core/drop_service.py` | ALTERADOS | Regras da caixa grátis (saldo menor que a chave, 1 a cada 10 min, rara com 5%) e o sorteio dela |
+| `app/controller/inventory_controller.py`, `app/controller/home_controller.py` (NOVO), `app/models/player_stats.py` (NOVO) | | Caixa grátis, destaque e os números da Home |
+| `app/view/home_view.py` | REESCRITO | **Home viva**: janelinha de estatísticas flutuando, pedestal com a skin em destaque, tecla **H** (modo wallpaper) |
+| `app/view/vitrine_3d.py` | NOVO | O **pedestal giratório** (uma cena 3D pequena só para ele) |
+| `app/view/scene_backdrop.py` | ALTERADO | A câmera do cenário "respira" na Home (menos de 2 graus para os lados) |
+| `app/view/inventory_view.py`, `case_opening.py`, `market_view.py`, `ui_kit.py` | ALTERADOS | Cartão **CAIXA GRÁTIS** no inventário, roleta sem chave, **DESTACAR NA HOME**, dica no mercado |
+| `app/assets/ui/caixa_gratis.png` | NOVO | Imagem da caixa grátis (a CS:GO Weapon Case com a faixa verde) |
+| `app/core/i18n_en.py` | ALTERADO | Os textos novos em inglês |
+| `app/unit_tests/*` | ALTERADOS | + 10 testes (107 no total); o autoteste do banco real ganhou 8 verificações (39) |
+
+**Passos**
+1. `git pull` (para ficar igual ao GitHub, `cab847b`) e extraia o ZIP por cima do projeto. *O coletor de preços pode continuar rodando.*
+   - [ ] `python -m compileall -q app main.py` não mostra nenhum erro (os arquivos do merge estão certos de novo).
+2. **Migração 004** (uma vez só), no **cmd**:
+   ```bat
+   C:\xampp\mysql\bin\mysql -u root -p < app\migrations\004_home_caixa_gratis.sql
+   ```
+   *(ou abra o arquivo no DBeaver e execute como script, Alt+X)*
+   - [ ] A conferência no fim mostra `last_free_case_at`, `featured_skin_id` e `movimentacoes 0`.
+3. Testes:
+   ```bat
+   python -m unittest app.unit_tests.test_i18n app.unit_tests.test_user_flow app.unit_tests.test_gacha_rules app.unit_tests.test_gacha_controllers app.unit_tests.test_sync_market
+   ```
+   - [ ] `Ran 107 tests` e `OK`.
+4. **Autoteste no banco real** (confere a migração no MariaDB de verdade):
+   ```bat
+   python -m app.unit_tests.manual_gacha_flow
+   ```
+   - [ ] Termina com `TUDO CERTO: 39 verificações passaram.` (inclui a parte "Extras 4").
+5. `python main.py` e entre. **HOME** (esta parte eu não consigo ver daqui, porque meu renderizador não carrega o mapa nem o PBR; me mande um print):
+   - [ ] À **esquerda**, o **pedestal** com a sua skin mais valiosa girando devagar (de costas aparece o outro lado da arma) e o nome numa plaquinha embaixo.
+   - [ ] À **direita**, a janelinha **SUAS ESTATÍSTICAS** balançando de leve, sem ficar em cima do personagem.
+   - [ ] O cenário mexe bem devagar (a câmera "respira") e o jogo continua fluido.
+   - [ ] **H** esconde o menu de cima (modo wallpaper); **H** ou **ESC** voltam.
+6. **INVENTÁRIO → skin**:
+   - [ ] O menu da skin tem **DESTACAR NA HOME**. Depois de clicar, o cartão ganha o selo **NA HOME** e a Home mostra essa skin com "SKIN EM DESTAQUE". **TIRAR DA HOME** volta para a mais valiosa.
+   - [ ] Vender a skin destacada também faz a Home voltar para a mais valiosa.
+7. **Caixa grátis** (para testar sem gastar o seu saldo, no DBeaver: `update users set balance = 5 where username = 'seu_usuario';`, depois SAIR e entrar de novo):
+   - [ ] O inventário mostra o cartão **CAIXA GRÁTIS** primeiro, com "Pronta para abrir!". VER CONTEÚDO mostra as skins baratas e a rara com 5%.
+   - [ ] **ABRIR GRÁTIS** abre a roleta **sem chave** ("Sem chave · 1 grátis a cada 10 minutos"); o saldo não muda; o resultado não tem ABRIR OUTRA.
+   - [ ] Depois, o cartão mostra "Libera em 09:59" contando. Na Home aparece "Próxima caixa grátis em ..." e, quando libera, o botão **CAIXA GRÁTIS PRONTA**.
+   - [ ] No MERCADO, tentar comprar sem saldo avisa: "Sem dinheiro? Abra a CAIXA GRÁTIS no INVENTÁRIO."
+   - [ ] Volte o saldo: `update users set balance = 500 where username = 'seu_usuario';` (e saia/entre).
+8. **Estatísticas**: compre, abra e venda alguma coisa e volte à Home.
+   - [ ] "Caixas abertas", "Gasto no mercado", "Recebido em vendas" e "MELHOR DROP" mudam. *(Contam só o que aconteceu depois da migração 004.)*
+   - [ ] Em inglês (EN no header), a Home aparece traduzida.
+9. Commit:
+   ```bat
+   git add -A
+   git commit -m "Extras 4: Home viva (estatisticas, pedestal, wallpaper) e caixa gratis"
+   git push
+   ```
+
+**Como explicar na apresentação**
+- **Estatísticas sem "contar na mão":** toda compra, abertura e venda grava uma linha em `user_transactions` **dentro da mesma transação** da operação (se a compra falhar, a linha também some). A Home soma tudo numa consulta (`SUM(CASE WHEN ...)`).
+- **Caixa grátis com regra no servidor:** a tela só mostra; quem decide é o DAO, dentro da transação e com a linha do jogador travada (`FOR UPDATE`). Dois cliques ao mesmo tempo não liberam duas caixas. A regra em si (`free_case_wait`) é uma função pura em `game_rules.py`, testada sozinha.
+- **Pedestal 3D sem modelo 3D:** a skin é a mesma imagem do mercado, num "cartão" girando dentro de uma cena 3D pequena com câmera em perspectiva (uma `DisplayRegion` própria, desenhada entre o cenário e a interface). O pedestal é desenhado por código (cilindros com cor nos vértices).
+- **Limites conhecidos:** os 10 minutos usam o relógio do PC (jogo local); as estatísticas começam a contar na migração 004.
+
+**Se der erro:** mande o print e o terminal inteiro. Os mais prováveis estão na seção 14 (migração 004 não rodada, caixa grátis que não aparece).
+
+### Extras 5 — CONFIGURAÇÕES, tela cheia, sons e cliques maiores (itens 11 a 14) · 20 min
+
+ZIP `cs-gacha-extras-5.zip`, feito a partir do **estado atual do GitHub** (`cab847b`). Já traz o Extras 4 (e o conserto do merge). **Sem migração nova** (a 004 do Extras 4 continua necessária) e **nenhuma biblioteca nova**: o Panda3D já toca áudio.
+
+| Arquivo | Situação | O que é |
+|---|---|---|
+| `app/view/settings_window.py` | NOVO | Pop-up **CONFIGURAÇÕES**: Minha conta, idioma, moeda (Automática / R$ / US$), janela ou tela cheia, volume dos efeitos e da música, animações da Home |
+| `app/core/preferencias.py` | NOVO | Guarda essas escolhas **neste PC** (`config.json` na pasta `.cs_gacha` do seu usuário, junto do idioma); arquivo faltando ou estragado = padrão |
+| `app/view/sons.py` | NOVO | Sons e música: clique em **todos** os botões, "tique" da roleta, som do resultado (outro para item raro), sucesso/erro dos avisos e a música do menu em loop |
+| `app/assets/sounds/` | NOVO | 6 efeitos + a música, todos **CC0**, com `CREDITOS.txt` e a licença da Kenney (~1,7 MB) |
+| `main.py` | ALTERADO | Carrega as preferências, liga os sons, aplica a tela cheia salva e o atalho **F11** |
+| `app/view/game_view_base.py` | ALTERADO | **CONFIGURAÇÕES** no header (no lugar do PT \| EN) e **área de clique** do menu, nome, CONFIGURAÇÕES e SAIR na **altura toda do header** |
+| `app/view/ui_kit.py` | ALTERADO | `ampliar_area()`; abas, setas de página e links com área de clique maior; avisos com som |
+| `app/core/game_rules.py` | ALTERADO | A moeda da tela segue as CONFIGURAÇÕES ("Automática" = como antes) |
+| `app/view/case_opening.py`, `home_view.py`, `vitrine_3d.py`, `login_register_view.py` | ALTERADOS | Sons da roleta; Home parada com as animações desligadas; link do login mais fácil de clicar |
+| `app/controller/view_manager.py` | ALTERADO | `tela_atual` (para reabrir as CONFIGURAÇÕES depois de redesenhar a tela) |
+| `app/core/i18n_en.py`, `app/unit_tests/test_preferencias.py` (NOVO) | | Textos novos em inglês; + 5 testes (112 no total) |
+| `.gitignore` | ALTERADO | Ignora `app/assets/_sounds/` (os arquivos que você baixou; o jogo usa as cópias de `app/assets/sounds`) |
+
+**Passos**
+1. Extraia o ZIP por cima do projeto. Ele parte do GitHub (`cab847b`, o merge quebrado) e já traz o Extras 4 e o conserto do merge, então **não precisa extrair o ZIP do Extras 4 antes**. A pasta `app/assets/_sounds` pode ficar ou ser apagada: ela não vai para o Git.
+   - **Se a migração 004 ainda não rodou** (a pasta `app\migrations` não tinha o `004_home_caixa_gratis.sql` antes deste ZIP), faça agora os **passos 2 (migração 004) e 4 (autoteste no banco real) do Extras 4** e, depois do passo 3 daqui, as conferências 5 a 8 dele (Home, destacar, caixa grátis, estatísticas).
+2. Testes (agora com o `test_preferencias`):
+   ```bat
+   python -m unittest app.unit_tests.test_preferencias app.unit_tests.test_i18n app.unit_tests.test_user_flow app.unit_tests.test_gacha_rules app.unit_tests.test_gacha_controllers app.unit_tests.test_sync_market
+   ```
+   - [ ] `Ran 112 tests` e `OK`.
+3. `python main.py` (**com som ligado no PC**):
+   - [ ] A **música** começa já no login; os botões fazem "clique".
+4. Entre. **Header**:
+   - [ ] À direita aparece **CONFIGURAÇÕES** (o PT \| EN do header foi para dentro dela; no login ele continua embaixo do formulário).
+   - [ ] Clique **no alto da barra** (bem acima das letras) de INVENTÁRIO, HOME, MERCADO, SAIR: funciona. Abas (CAIXAS/SKINS) e setas de página também aceitam clique um pouco fora das letras.
+5. **CONFIGURAÇÕES**:
+   - [ ] **MOEDA → US$**: em português, os valores aparecem em US$ (ex.: "US$ 95,79"). **AUTOMÁTICA** volta ao normal. Em inglês dá para escolher R$.
+   - [ ] **IDIOMA**: a tela troca e a janela abre de novo, já no idioma novo.
+   - [ ] **TELA CHEIA** (e **F11**): vai para a tela cheia e volta. Feche e abra o jogo: ele lembra.
+   - [ ] **EFEITOS SONOROS / MÚSICA**: − e + mudam o volume na hora; no 0 aparece "Sem som".
+   - [ ] **ANIMAÇÕES DA HOME → DESLIGADAS**: na Home, câmera, janelinha e pedestal ficam parados. LIGADAS volta.
+   - [ ] **MINHA CONTA** abre o pop-up de sempre. ESC fecha as CONFIGURAÇÕES.
+6. **Sons no jogo**:
+   - [ ] Comprar: som de sucesso. Sem saldo: som de erro.
+   - [ ] Abrir caixa: "tique" a cada cartão que passa (rápido no começo, devagar no fim) e um som no resultado (outro, mais "festivo", para Covert, ★ e Contrabando).
+7. Commit:
+   ```bat
+   git add -A
+   git commit -m "Extras 5: configuracoes, tela cheia, sons e cliques maiores"
+   git push
+   ```
+
+**Como explicar na apresentação**
+- **Sons sem problema de direito autoral:** todos CC0 (domínio público): efeitos da Kenney e música de Alex McCulloch, com créditos em `app/assets/sounds/CREDITOS.txt` e na própria janela de CONFIGURAÇÕES. Os sons do CS não são usados.
+- **Um clique para todos os botões:** o DirectGUI tem um "som de clique padrão" (`DGG.setDefaultClickSound`); ligado uma vez no início, vale para todo botão criado depois.
+- **Preferência é do computador, não da conta:** idioma, moeda, tela cheia e volume ficam num JSON na pasta do usuário. No PC do professor, cada um escolhe as suas sem mexer no banco.
+- **Tela cheia:** `WindowProperties` do Panda3D pedindo tela cheia na resolução do monitor; se o Windows recusar, o jogo volta para a janela sozinho.
+
+**Se der erro:** mande o print e o terminal inteiro.
+
 ### Plano das Fases 4 e 5 (o que foi pedido e onde está)
 
 | Tarefa | Onde está | Situação |
@@ -905,8 +1016,8 @@ ZIP `cs-gacha-extras-3.zip`, feito a partir do seu commit `570efa8` (já traz os
 
 | Tarefa | O que entra | Validação |
 |---|---|---|
-| T6.1 **Animação procedural da Home**: câmera passeando devagar, respiração e balanço do personagem, poeira/luz | `LerpInterval`/`Sequence` do Panda3D, sem biblioteca nova | Movimento suave, sem travar o FPS |
-| T6.2 **Equipar skin**: botão EQUIPAR no inventário + **vitrine** na Home (imagem, nome, raridade, float) | Migração `003_equipar_skin.sql` (`users.equipped_skin_id`, preserva os dados) + método no `Inventory_DAO`/controller | Equipar, sair e entrar de novo: a vitrine continua |
+| T6.1 🟦 **Animação da Home** (Extras 4): câmera "respirando", janelinha de estatísticas flutuando e pedestal girando | Tarefas do Panda3D a cada quadro, sem biblioteca nova | Movimento suave, sem travar o FPS |
+| T6.2 🟦 **Skin em destaque** (Extras 4): DESTACAR NA HOME no inventário + **pedestal** na Home | Migração `004_home_caixa_gratis.sql` (`users.featured_skin_id`, preserva os dados) | Destacar, sair e entrar de novo: o pedestal continua |
 | T6.3 *(bônus)* AK-47 3D com a animação oficial **`inventory_inspect`** na vitrine | `Actor` + `panda3d-gltf` | A arma gira como no "inspecionar" do jogo |
 | T6.4 ✅ **Mirage otimizada** (correção 4): só a área vista pela câmera + texturas reduzidas, para caber no Git | Pasta `app/assets/maps/mirage_menu/` (~50 MB) | T3.5 |
 | T6.5 *(opcional, depois da apresentação)* Tirar do Git as 704 imagens do mapa completo (`app/assets/maps/*.png`, 234 MB), que o jogo não usa mais | `git rm` das imagens antigas | O jogo abre igual; a pasta `mirage_menu` continua |
@@ -916,7 +1027,7 @@ ZIP `cs-gacha-extras-3.zip`, feito a partir do seu commit `570efa8` (já traz os
 - [ ] Prints, diagrama ER e de sequência (seções 4 e 5) e **o gráfico de preços** nos slides.
 - [ ] Vídeo da demo gravado (plano B).
 
-**Roteiro de aceite:** cadastrar → login → R$ 500,00 → comprar caixa → abrir (roleta) → ver o item no inventário → detalhes → equipar (vitrine na Home) → vender → saldo confere → fechar e abrir o jogo de novo → tudo persistiu.
+**Roteiro de aceite:** cadastrar → login → R$ 500,00 → comprar caixa → abrir (roleta) → ver o item no inventário → detalhes → destacar na Home (pedestal) → estatísticas da Home → vender → saldo confere → fechar e abrir o jogo de novo → tudo persistiu.
 
 ---
 
@@ -925,8 +1036,8 @@ ZIP `cs-gacha-extras-3.zip`, feito a partir do seu commit `570efa8` (já traz os
 | Dia | Eu (código) | Você (integrar e validar) |
 |---|---|---|
 | **Sex 02/10** | Correções 3, 4 e 5 ✅ · Fases 4 e 5 ✅ · **Extras 1** (catálogo completo) ✅ · **Extras 2** (busca, Ctrl+A, skin maior, compra múltipla, Minha conta) ✅ · **Extras 3** (português/inglês) ✅ | Fases 4 e 5 validadas ✅ · **Extras 1** (para o coletor pegar as caixas novas) |
-| **Sáb 03/10** | **Extras 4** (Home viva, caixa grátis) | Integrar Extras 2 e 3 |
-| **Dom 04/10** | Ajustes do que você encontrar nos Extras 2 a 4 | Integrar Extras 4 |
+| **Sáb 03/10** | **Extras 4** (Home viva, caixa grátis) ✅ · **Extras 5** (Configurações, tela cheia, sons, cliques) ✅ | Integrar Extras 2 a 5 |
+| **Dom 04/10** | Ajustes do que você encontrar nos Extras 2 a 5 | Integrar Extras 5 |
 | **Seg 05/10** | Folga para correções | — |
 | **Ter–Qua 06–07/10** | Ajustes finos e correções; slides com você | Roteiro de aceite, slides, vídeo |
 | **Qui 08/10** | **Congelar o código** | Dump do banco com o histórico → PC do professor (12.2) · ensaiar |
@@ -964,7 +1075,8 @@ Depois leve o banco **pronto** do seu PC, que já tem os preços reais **e o his
   ```
   O dump **substitui** as tabelas do PC do professor: contas criadas lá antes somem e passam a valer as do seu PC. O usuário do MySQL do `.env` (o `GRANT` da T2.3) não vai no dump; se o `.env` de lá não usa `root`, crie o usuário lá antes.
 - [ ] Confira nos dois PCs (DBeaver): `select count(*) from price_history;` dá o **mesmo número**.
-*Alternativa com internet lá:* `schema.sql` + `seed_base.sql`, depois `python tools/sync_market.py --sem-precos` (catálogo; as imagens vêm pelo Git) e `python tools/sync_market.py --so-precos` (deixe rodando).
+*(O dump já leva as tabelas e colunas das migrações 003 e 004.)*
+*Alternativa com internet lá:* `schema.sql` + `seed_base.sql` (o `schema.sql` já inclui as migrações), depois `python tools/sync_market.py --sem-precos` (catálogo; as imagens vêm pelo Git) e `python tools/sync_market.py --so-precos` (deixe rodando).
 - [ ] Rode o autoteste (T3.2) e o roteiro de aceite **no PC do professor**.
 
 ---
@@ -978,6 +1090,8 @@ Depois leve o banco **pronto** do seu PC, que já tem os preços reais **e o his
 | Mapa 3D | O jogo usa a **Mirage recortada** (`mirage_menu`, ~50 MB), que vai pelo Git. O `de_mirage_d.glb` completo (103 MB) continua fora do Git e **não é mais necessário** (só serve de reserva). O cenário é opcional: sem os arquivos o jogo funciona e só avisa no terminal. |
 | PC do professor lento para o 3D | O cenário carrega durante o login; fique alguns segundos nele antes de entrar. Em último caso o jogo funciona sem o cenário. |
 | Bug de última hora | Congelar na quinta; `git tag` em cada marco permite voltar (`git checkout marco-3-backend`). |
+| Tela cheia no projetor | A tela cheia abre no monitor **principal** do PC. Com o projetor em "Estender", o jogo vai para a tela do notebook: use **"Duplicar"** (Windows + P) ou deixe o projetor como tela principal. Se algo der errado, **F11** volta para a janela. |
+| Som na apresentação | Teste o volume da sala antes; nas CONFIGURAÇÕES dá para baixar ou zerar a música sem tirar os efeitos. |
 
 ---
 
@@ -1013,6 +1127,12 @@ Depois leve o banco **pronto** do seu PC, que já tem os preços reais **e o his
 | Em inglês, algum texto aparece em português | Texto sem tradução (o terminal mostra `Sem tradução para o inglês: '...'`) | Mande a linha do terminal; a tela segue funcionando com o texto em português |
 | Os valores em dólar parecem altos/baixos | Cotação fixa em `app/core/game_rules.py` (`BRL_PER_USD = 5.22`) | Troque o número (só muda a exibição; o banco continua em reais) |
 | O jogo abre sempre em inglês | O idioma escolhido fica salvo | Clique em **PT** no login ou no header (ou apague a pasta `.cs_gacha` dentro da sua pasta de usuário) |
+| Depois do Extras 4, comprar/abrir/vender dá "Não foi possível concluir..." e o terminal mostra `Table 'csgacha.user_transactions' doesn't exist` (ou `Unknown column 'last_free_case_at'`) | Migração 004 não rodou | Rode a migração 004 (Extras 4, passo 2) |
+| A caixa grátis não aparece | Ela só aparece com saldo **menor que a chave** (R$ 13,50) | Para testar: `update users set balance = 5 where username = 'seu_usuario';`, saia e entre de novo |
+| Home sem o pedestal | Você ainda não tem skins (aparece "Abra uma caixa...") | Abra uma caixa ou compre uma skin |
+| Sem som nenhum | Volume zerado nas CONFIGURAÇÕES, ou o Windows mandando o som para outra saída | Confira EFEITOS SONOROS e MÚSICA nas CONFIGURAÇÕES e a saída de áudio do Windows. Arquivos faltando aparecem no terminal como `Som não encontrado` |
+| A tela cheia não fica (volta para a janela) | O Windows não aceitou a resolução | O jogo volta sozinho para a janela e avisa no terminal. Use a janela (ou maximize) |
+| As configurações voltam ao padrão | O arquivo `config.json` (pasta `.cs_gacha` do seu usuário) foi apagado ou ficou ilegível | Escolha de novo; o jogo cria o arquivo outra vez |
 
 ---
 

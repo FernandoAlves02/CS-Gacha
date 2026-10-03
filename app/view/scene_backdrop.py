@@ -1,10 +1,12 @@
 import logging
+import math
 import time
 from collections import deque
 from pathlib import Path
 
 from panda3d.core import (
     AmbientLight,
+    ClockObject,
     DirectionalLight,
     Filename,
     Point3,
@@ -33,6 +35,11 @@ COR_FUNDO_UI = (0.05, 0.05, 0.07, 1)
 TASK_GPU = "cenario_preparar_gpu"
 TEXTURAS_POR_QUADRO = 4
 TEMPO_POR_QUADRO = 0.008
+
+# Câmera da Home (e o leve balanço dela no "modo vivo" da Home, Extras 4)
+CAMERA_POS = Point3(-33.60, 19.90, -1.70)
+CAMERA_HPR = Vec3(130, 0, 0)
+TASK_BALANCO = "cenario_balanco_camera"
 
 
 class SceneBackdrop:
@@ -85,8 +92,8 @@ class SceneBackdrop:
         except ImportError:
             logger.warning("simplepbr não instalado: cenário sem PBR.")
 
-        self.app.camera.setPos(Point3(-33.60, 19.90, -1.70))
-        self.app.camera.setHpr(Vec3(130, 0, 0))
+        self.app.camera.setPos(CAMERA_POS)
+        self.app.camera.setHpr(CAMERA_HPR)
         self.app.camLens.setFov(80)
         self._criar_luzes()
 
@@ -120,6 +127,23 @@ class SceneBackdrop:
     def ocultar(self):
         self._visivel = False
         self._aplicar_visibilidade()
+
+    def iniciar_balanco(self):
+        """Home: a câmera "respira" devagar (gira menos de 2 graus para os lados).
+        O personagem está preso à câmera, então só o mapa ao fundo se move."""
+        if not self.app.taskMgr.hasTaskNamed(TASK_BALANCO):
+            self._tempo_balanco = 0.0
+            self.app.taskMgr.add(self._balancar, TASK_BALANCO)
+
+    def parar_balanco(self):
+        self.app.taskMgr.remove(TASK_BALANCO)
+        self.app.camera.setHpr(CAMERA_HPR)
+
+    def _balancar(self, task):
+        self._tempo_balanco += min(ClockObject.getGlobalClock().getDt(), 0.1)
+        t = self._tempo_balanco
+        self.app.camera.setHpr(CAMERA_HPR + Vec3(1.6 * math.sin(t * 0.21), 0.5 * math.sin(t * 0.13 + 1.0), 0))
+        return task.cont
 
     # ----------------------------------------------------------
     # Carregamento

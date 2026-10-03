@@ -10,9 +10,9 @@ Rodar da raiz do projeto:
 import random
 import unittest
 from datetime import datetime, timedelta
-from datetime import datetime, timedelta
 from decimal import Decimal
 
+from app.controller.home_controller import Home_Controller
 from app.controller.inventory_controller import Inventory_Controller
 from app.controller.market_controller import Market_Controller
 from app.core import game_rules as rules
@@ -62,9 +62,6 @@ class FakeRarityDAO:
     def get_all(self):
         return list(RARIDADES.values())
 
-    def get_all(self):
-        return list(RARIDADES.values())
-
 
 class FakeSkinCatalogDAO:
     def count_market_listings(self, search="", rarity_id=None):
@@ -73,13 +70,6 @@ class FakeSkinCatalogDAO:
     def get_market_listings(self, search="", limit=24, offset=0, rarity_id=None):
         self.ultimo = (search, limit, offset)
         return []
-
-    def get_history_for_listings(self, listings):
-        agora = datetime(2026, 10, 5, 8, 0)
-        historico = {par: [] for par in listings}
-        historico[(10, "Field-Tested")] = [(agora - timedelta(hours=24), Decimal("2.00")),
-                                           (agora, Decimal("2.50"))]
-        return historico
 
     def get_history_for_listings(self, listings):
         agora = datetime(2026, 10, 5, 8, 0)
@@ -128,6 +118,27 @@ class FakeInventoryDAO:
     def sell_skin(self, user_id, skin_instance_id):
         self._talvez_erro()
         return Decimal("8.50"), Decimal("508.50")
+
+    # caixa grátis e skin em destaque (Extras 4)
+    estado_gratis = (Decimal("5.00"), None)
+
+    def get_free_case_state(self, user_id):
+        return self.estado_gratis
+
+    def open_free_case(self, user_id, skin_id, float_value, now):
+        self.chamadas.append(("open_free_case", skin_id, float_value, now))
+        self._talvez_erro()
+        return 78, Decimal("1.10"), Decimal("5.00")
+
+    def set_featured_skin(self, user_id, skin_instance_id):
+        self.chamadas.append(("set_featured", skin_instance_id))
+        self._talvez_erro()
+
+
+class FakeCatalogoGratis:
+    def get_free_case_pool(self, common_count, rare_min_price):
+        self.pedido = (common_count, rare_min_price)
+        return [SKINS[0]], SKINS[1]
 
 
 def novo_usuario(saldo="500.00"):
@@ -302,13 +313,6 @@ class InventoryControllerTests(unittest.TestCase):
         self.assertEqual(self._controller().case_contents(99), [])       # caixa sem itens
         self.assertFalse(self.view.last[1])                               # avisa o jogador
 
-    def test_conteudo_da_caixa_para_a_roleta(self):
-        tabela = self._controller().case_contents(1)
-        self.assertEqual([s.id for s, _ in tabela], [10, 11])
-        self.assertAlmostEqual(float(sum(c for _, c in tabela)), 1.0, places=12)
-        self.assertEqual(self._controller().case_contents(99), [])       # caixa sem itens
-        self.assertFalse(self.view.last[1])                               # avisa o jogador
-
     def test_abrir_caixa_devolve_resultado_pronto_para_a_tela(self):
         c = self._controller()
         resultado = c.open_case(1)
@@ -335,12 +339,67 @@ class InventoryControllerTests(unittest.TestCase):
         self.assertEqual(self.inv.chamadas, [])                # nada foi consumido
         self.assertFalse(self.view.last[1])
 
+    def _controller_gratis(self, inv=None, agora=datetime(2026, 10, 5, 20, 0)):
+        self.view = FakeView()
+        self.inv = inv or FakeInventoryDAO()
+        self.user = novo_usuario("5.00")
+        return Inventory_Controller(self.inv, FakeCollectionDAO(), FakeRarityDAO(), self.view, self.user,
+                                    random.Random(4), skin_catalog_dao=FakeCatalogoGratis(), clock=lambda: agora)
+
+    def test_caixa_gratis_conteudo_e_abertura(self):
+        c = self._controller_gratis()
+        self.assertEqual(c.free_case_wait(), timedelta(0))          # saldo R$ 5,00 e nunca abriu
+        tabela = c.free_case_contents()
+        self.assertEqual([(s.id, ch) for s, ch in tabela], [(10, Decimal("0.95")), (11, Decimal("0.05"))])
+        resultado = c.open_free_case(tabela)
+        nome, skin_id, _float, quando = self.inv.chamadas[-1]
+        self.assertEqual((nome, quando), ("open_free_case", datetime(2026, 10, 5, 20, 0)))
+        self.assertIn(skin_id, (10, 11))
+        self.assertEqual(resultado.skin_instance.id, 78)
+        self.assertFalse(resultado.can_open_another)                 # a próxima só daqui a 10 min
+        self.assertEqual(self.view.messages, [])
+
+    def test_caixa_gratis_recusada_pelo_banco_mostra_o_motivo(self):
+        c = self._controller_gratis(inv=FakeInventoryDAO(erro=ValueError("A próxima caixa grátis libera em 09:59.")))
+        self.assertIsNone(c.open_free_case(c.free_case_contents()))
+        self.assertEqual(self.view.last, ("A próxima caixa grátis libera em 09:59.", False))
+
+    def test_skin_em_destaque(self):
+        c = self._controller()
+        self.assertTrue(c.set_featured(5))
+        self.assertEqual(self.inv.chamadas[-1], ("set_featured", 5))
+        self.assertEqual(self.view.last, ("Skin em destaque na Home!", True))
+        self.assertTrue(c.set_featured(None))
+        self.assertTrue(self.view.last[1])
+
     def test_vender(self):
         c = self._controller()
         self.assertEqual(c.sale_quote(5), (Decimal("10.00"), Decimal("8.50")))
         self.assertEqual(c.sell_skin(5), Decimal("8.50"))
         self.assertEqual(self.user.balance, Decimal("508.50"))
         self.assertTrue(self.view.last[1])
+
+
+class HomeControllerTests(unittest.TestCase):
+    """Home (Extras 4): se o banco falhar, a Home continua de pé (sem estatísticas)."""
+
+    def test_banco_fora_do_ar_nao_derruba_a_home(self):
+        class DaoQuebrado:
+            def __getattr__(self, nome):
+                def falha(*_args):
+                    raise RuntimeError("banco caiu")
+                return falha
+        c = Home_Controller(DaoQuebrado(), novo_usuario())
+        with self.assertLogs("app.controller.home_controller", level="ERROR"):
+            self.assertIsNone(c.stats())
+            self.assertEqual(c.featured(), (None, False))
+            self.assertIsNone(c.free_case_wait())
+
+    def test_contagem_da_caixa_gratis(self):
+        dao = FakeInventoryDAO()
+        dao.estado_gratis = (Decimal("2.00"), datetime(2026, 10, 5, 19, 55))
+        c = Home_Controller(dao, novo_usuario("2.00"), clock=lambda: datetime(2026, 10, 5, 20, 0))
+        self.assertEqual(c.free_case_wait(), timedelta(minutes=5))
 
 
 if __name__ == "__main__":

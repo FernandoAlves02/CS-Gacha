@@ -1,6 +1,8 @@
 import re
 from decimal import Decimal
 
+from app.core.i18n import t
+
 
 class User:
     # Saldo inicial de todo novo jogador (regra definida em um único lugar).
@@ -30,24 +32,24 @@ class User:
     def validate_username(username):
         username = (username or "").strip()
         if not 3 <= len(username) <= 50:
-            raise ValueError("O nome de usuário deve ter entre 3 e 50 caracteres.")
+            raise ValueError(t("O nome de usuário deve ter entre 3 e 50 caracteres."))
         # O login aceita usuário OU e-mail e decide pelo "@". Por isso o nome
         # de usuário não pode ter "@" (senão poderia ser confundido com um e-mail).
         if "@" in username:
-            raise ValueError("O nome de usuário não pode conter @.")
+            raise ValueError(t("O nome de usuário não pode conter @."))
         return username
 
     @staticmethod
     def validate_email(email):
         email = (email or "").strip().lower()
         if len(email) > 100 or not User._EMAIL_REGEX.match(email):
-            raise ValueError("Informe um e-mail válido.")
+            raise ValueError(t("Informe um e-mail válido."))
         return email
 
     @staticmethod
     def validate_password(password):
         if not password or len(password) < 6:
-            raise ValueError("A senha deve ter pelo menos 6 caracteres.")
+            raise ValueError(t("A senha deve ter pelo menos 6 caracteres."))
         return password
 
     # ----------------------------------------------------------
@@ -96,7 +98,7 @@ class User:
         # (o MySQL devolve DECIMAL como Decimal).
         new_balance = Decimal(str(new_balance))
         if new_balance < 0:
-            raise ValueError("O saldo não pode ficar negativo.")
+            raise ValueError(t("O saldo não pode ficar negativo."))
         self._balance = new_balance
 
     def update_data(

@@ -16,6 +16,15 @@ values
 	(4, 'Covert',         0.0064, '#eb4b4b'),
 	(5, 'Special Item',   0.0026, '#e4ae39');
 
+--    Raridades que só existem nas coleções de mapa (não saem de caixa, por
+--    isso a chance é 0): as skins delas aparecem só no mercado. (migração 003)
+insert into rarities
+	(id, name, probability, color)
+values
+	(6, 'Consumer Grade',   0.0000, '#b0c3d9'),
+	(7, 'Industrial Grade', 0.0000, '#5e98d9'),
+	(8, 'Contraband',       0.0000, '#e4ae39');
+
 -- 2. USUÁRIO DE TESTES
 --    Login: testes (ou teste@teste.com)  |  Senha: teste123
 --    A senha fica guardada como hash no formato salt$sha256 (Password_Utils).

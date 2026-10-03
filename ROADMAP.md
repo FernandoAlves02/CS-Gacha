@@ -1,9 +1,9 @@
-# CS Gacha — Roadmap v2 e Tutorial de Integração (Fases 2 e 3)
+# CS Gacha — Roadmap v2 e Tutorial de Integração (Fases 2 a 5)
 
 > Atualizado em **02/10/2026**. Substitui o roadmap de 01/10.
 > Base: Documentação do Projeto, branch `refactoring` e as respostas às decisões D1–D12.
-> **Estado conferido em 02/10, 16h15:** o seu PC e o GitHub estão no mesmo commit, `bad0600` ("Fase 3", 12h41), sem nenhuma alteração pendente. Tudo o que veio depois (troca da Skinport pela Steam, coletor contínuo, README em UTF-8, cenário no login e Mirage recortada) está na **correção 4**, que é **cumulativa**: extraia só ela (as 2 partes) e ignore os ZIPs das correções anteriores.
-> **Como usar:** siga as seções 7 e 8 na ordem. Cada tarefa tem **Passos**, **Validação** (só marque `[x]` quando passar) e **Se der erro**. A seção 9 explica o código para você conseguir apresentar.
+> **Estado conferido em 02/10, 22h:** Fases 4 e 5 validadas por você e no GitHub (`570efa8`): **MVP completo**. Os **extras** (seção 2.4) são feitos a partir desse commit, em pacotes pequenos: tutoriais na seção 10, depois das Fases 4 e 5. **Entregues:** Extras 1 (catálogo completo), **Extras 2** (busca, Ctrl+A, skin maior, compra múltipla e "Minha conta", que fecha o item 0 da documentação) e **Extras 3** (português/inglês, com US$).
+> **Como usar:** siga as seções 7, 8 e 10 na ordem. Cada tarefa tem **Passos**, **Validação** (só marque `[x]` quando passar) e **Se der erro**. A seção 9 explica o código para você conseguir apresentar.
 
 ---
 
@@ -18,7 +18,7 @@
 7. [Tutorial — Fase 2 (dados reais no banco)](#7-tutorial--fase-2-dados-reais-no-banco)
 8. [Tutorial — Fase 3 (backend do gacha + nova tela de login)](#8-tutorial--fase-3-backend-do-gacha--nova-tela-de-login)
 9. [Entendendo o código (para a apresentação)](#9-entendendo-o-código-para-a-apresentação)
-10. [Fases 4 a 7 (próximos passos)](#10-fases-4-a-7-próximos-passos)
+10. [Fases 4 a 7 (tutorial das Fases 4 e 5)](#10-fases-4-a-7)
 11. [Calendário](#11-calendário)
 12. [PC do professor](#12-pc-do-professor)
 13. [Riscos e plano B](#13-riscos-e-plano-b)
@@ -35,28 +35,34 @@
 | 1 | Login e cadastro funcionando no banco | ✅ concluída (01/10) |
 | 2 | Catálogo real (caixas, skins, raridades, floats) e preços reais no banco | ✅ catálogo e imagens (02/10) · 🟦 preços reais pela Steam: T2.4 passo 3 |
 | 3 | Backend do gacha (sorteio, comprar, abrir, vender, inventário) + nova tela de login | ✅ validada no seu PC (02/10): testes, autoteste 31/31, login |
-| 4 | Tela do Mercado (caixas e skins avulsas) | ⏳ próxima |
-| 5 | Inventário real, abertura com roleta, venda, detalhes | ⏳ |
+| 4 | Tela do Mercado (caixas e skins avulsas) | ✅ validada no seu PC e no GitHub (02/10, `570efa8`) |
+| 5 | Inventário real, abertura com roleta, venda, detalhes | ✅ validada no seu PC e no GitHub (02/10, `570efa8`) |
 | 6 | Home viva (animação), vitrine "equipar", Mirage otimizada | ✅ Mirage recortada e cenário carregando no login (correção 4, 02/10: T3.5) · ⏳ animação e vitrine (D12) |
+| Extras | Pedidos de 02/10 (seção 2.4) | 🟦 Extras 1, 2 e 3 entregues (seção 10) · ⏳ Extras 4 (Home viva, caixa grátis) |
 | 7 | Testes de aceite, documentação, apresentação | ⏳ |
 | — | Coletor de preços contínuo para o histórico (D10) | 🟦 **código pronto**: deixar rodando (T2.6) |
 
 **Como o código das Fases 2 e 3 foi validado antes de chegar até você:**
 
-- **67 testes automáticos** (regras, sorteio, controllers, importador e login) passando.
+- **Testes automáticos** (regras, sorteio, controllers, importador e login) passando: 67 nas Fases 2 e 3, 74 com as Fases 4 e 5.
 - **Simulação de 200.000 aberturas:** cada raridade ficou a menos de 0,07 ponto percentual da chance oficial, e a distribuição de desgaste saiu em 3/24/33/24/16%.
 - **Fluxo completo dos DAOs** rodado num banco de conferência gerado a partir do `schema.sql`: comprar, abrir, vender, comprar skin, preço que mudou, saldo insuficiente, inventário em 1.000, skin de outro jogador, rollback sem consumir a caixa e conexões sempre fechadas. 45 de 45 verificações passaram.
 - **Importador** testado com os **dados reais da CSGO-API** vindos do seu PC (6 caixas, 355 skins, 0 avisos) e com a Steam simulada (19 de 19): preço real, item sem anúncio, limite de consultas, sem internet, Ctrl+C e retomada.
 - **Tela de login** comparada com o seu mockup (prévia com as mesmas medidas e fontes) e a lógica dela exercitada com um Panda3D simulado (30 de 30).
 - **Correção 4 (cenário no login + Mirage recortada):** o carregamento em segundo plano foi exercitado com um Panda3D simulado (46 de 46: modelos terminando fora de ordem, arquivo faltando ou corrompido, jogador entrando antes do fim, envio à placa de vídeo dividido em vários quadros). O mapa recortado foi conferido arquivo por arquivo e comparado com o original em 4 posições de câmera.
 
+- **Fases 4 e 5 (telas):** desta vez eu compilei o **Panda3D 1.10 de verdade** aqui (com o renderizador por software dele) e rodei o **jogo inteiro** com um banco de conferência montado com o **catálogo real** (6 caixas, 389 skins, 1.430 anúncios) e um histórico de preços simulado. Resultado: **39 de 39** verificações de ponta a ponta (login, cadastro, comprar caixa e skin, busca, filtros, páginas, detalhes, venda, abertura com roleta, sem saldo para a chave, 15 trocas de tela sem sobrar widget/tarefa/evento, sair e entrar de novo, janela 4:3) e **prints de todas as telas**. Um revisor independente leu o código e os 4 problemas que ele achou foram corrigidos. **74 testes** automáticos passando.
+
+- **Extras 2 (busca, Ctrl+A, skin maior, compra múltipla e Minha conta):** mesmo processo, com o jogo real aberto aqui. **84 testes** automáticos, **23 de 23** verificações do Extras 2 e **27 de 27** do Ctrl+A com **teclas de verdade** passando pela caixa de texto do Panda3D (setas, Home, End, Delete, Backspace, TAB, clique). As 39 de ponta a ponta das Fases 4 e 5 continuam passando. Um revisor independente leu o código; os pontos que ele achou (o principal: seta/Home/End com o texto marcado apagavam tudo) foram corrigidos e ganharam teste.
+- **Extras 3 (português/inglês):** **97 testes** automáticos (13 novos; um deles lê o código e confere que **todo texto da tela tem tradução**, com os mesmos valores) e **35 de 35** verificações com o jogo real em inglês (login, cadastro, header, mercado, compra de 4 caixas, inventário, abertura, venda, Minha conta, volta ao português, troca de idioma 8 vezes sem sobrar nada, janela ultralarga). Todas as verificações em português continuam passando. Um revisor independente comparou o português antes e depois em 80.000 valores (dinheiro, chance, variação, float, data): **nenhuma diferença**. Os pontos que ele achou foram corrigidos.
+
 ### 1.1 Próximos passos (na ordem)
 
-1. Extrair as **2 partes da correção 4** por cima do projeto e fazer a **T3.5** (testar o jogo, commit e push).
-2. Deixar o **coletor de preços** rodando (**T2.6**). A primeira passada dele é a mesma etapa de preços da T2.4 (passo 3), então não precisa rodar as duas.
-3. **PC do professor** (12.1).
+1. **Extras 1** (seção 10), se ainda não fez: migração 003, importação e coletor.
+2. **Extras 2** e **Extras 3** (seção 10): testes, checklist e commit de cada um. *Cada ZIP já contém os anteriores; extraia sempre na ordem 1 → 2 → 3.*
+3. Deixar o **coletor de preços** rodando (**T2.6**) no fim de semana.
 
-> **O que eu NÃO consegui testar aqui** (meu ambiente não tem internet para pacotes nem MariaDB): a **janela real** do Panda3D, o **MariaDB do XAMPP** e as **APIs reais**. Por isso existem a tarefa **T3.2** (autoteste no seu banco) e a **T3.3** (checklist visual do login). Se algo falhar, copie a mensagem inteira e me mande.
+> **O que eu NÃO consegui testar aqui:** a sua **placa de vídeo** (os prints daqui não têm o cenário 3D nem o PBR, e o renderizador por software deixa as imagens um pouco serrilhadas), o **MariaDB do XAMPP** e as **APIs reais**. Por isso cada fase tem o checklist visual no seu PC. Se algo falhar, copie a mensagem inteira e me mande.
 
 ---
 
@@ -85,6 +91,35 @@ Cada regra de jogo é **uma constante** em `app/core/game_rules.py`. Para mudar,
 | **D12** | Animação na Home e "equipar skin" | **Animação procedural**: câmera passeando devagar pelo cenário, o personagem com um leve movimento de respiração e balanço, e luz e poeira no ar. **Equipar:** no inventário, o botão EQUIPAR põe a skin numa **vitrine na Home** (imagem grande, nome, raridade, float), ao lado do personagem. **Bônus:** a AK-47 3D girando com a animação oficial de inspeção (`inventory_inspect`). | Os personagens `*_spawnpoint.glb` são **estátuas**: sem esqueleto e sem animações, com a arma "colada" no corpo. Animação de esqueleto não é possível neles. A **skin 3D real** na arma também não: a API só traz a imagem 2D de cada skin, e as texturas 3D (padrão + máscaras + desgaste) teriam de ser extraídas do jogo uma a uma. A vitrine entrega a mesma ideia ("minha skin em destaque na Home") com risco baixo. |
 
 **Ordem de prioridade:** MVP (Fases 4 e 5, já no estilo CS2) → coletor rodando em paralelo (custo zero) → gráfico → Home viva (animação) → vitrine "equipar" → otimização da Mirage. Se o tempo apertar, os extras saem nessa ordem, de trás para frente.
+
+### 2.3 Decisões das Fases 4 e 5 (padrão aplicado; me diga se quiser diferente)
+
+| # | Pergunta | Padrão aplicado |
+|---|---|---|
+| **D13** | Mockup do grupo para Mercado e Inventário? | Sem mockup: estilo do CS2 (painéis escuros, faixa e brilho da cor da raridade, botões laranja como o ENTRAR). Se o grupo tiver um desenho, eu ajusto. |
+| **D14** | "LOJA" ou "MERCADO" no menu? | **MERCADO** (nome da documentação). É só o texto em `MENU_ITEMS` (`game_view_base.py`). |
+| **D15** | Filtros do inventário | **TUDO / CAIXAS / SKINS** (as outras categorias eram do escopo cortado, D6). |
+| **D16** | Onde abrir caixa | **No Inventário**, como no CS2: clica na caixa → ABRIR CAIXA → roleta. No Mercado, a compra avisa que a caixa foi para o inventário. |
+
+### 2.4 Extras pós-MVP (pedidos de 02/10, 21h18)
+
+| # | Pedido | Decisão | Pacote |
+|---|---|---|---|
+| 0 | *(da documentação)* Ver e editar os dados da conta | Clicar no nome no header abre "Minha conta" | 🟦 **Extras 2** (E2) |
+| 1 | Comprar várias caixas/skins de uma vez | Quantidade na janela de compra (1 a 50), numa transação só | 🟦 **Extras 2** (E2) |
+| 2 | Todas as caixas e skins | **As 42 caixas + as skins das coleções de mapa** (estas só no mercado, porque não saem de caixa). 3 raridades novas (Consumer, Industrial, Contraband) pela migração 003 | ✅ **Extras 1** (E1) |
+| 3 | Home viva | Janela flutuante com estatísticas (caixas abertas, valores movimentados...), skin em destaque num pedestal girando, câmera com leve movimento, tecla para esconder a interface (wallpaper) | Extras 4 |
+| 4 | Skin maior no mercado | Imagem maior no painel e clique para ampliar | 🟦 **Extras 2** (E2) |
+| 5 | Ctrl+A nos campos de texto | Ctrl+A marca tudo; a próxima tecla substitui e Backspace/Delete apagam | 🟦 **Extras 2** (E2) |
+| 6 | Busca melhor | Palavras em qualquer ordem ("ak inheritance", "ak-47 inheritance" e "ak47" acham a AK-47 \| Inheritance) | 🟦 **Extras 2** (E2) |
+| 7 | Caixa gratuita | Skins baratas + 1 rara, sem chave. Aparece quando o saldo não paga a chave (< R$ 13,50), no máximo 1 vez a cada 10 min | Extras 4 |
+| 8 | Português e inglês | Troca de idioma no login e no header. Em inglês os valores aparecem em **US$**, convertidos por uma cotação definida em `game_rules.py` (o banco continua em R$) | 🟦 **Extras 3** (E3) |
+| 9 | Banco online | **Depois da apresentação** (decisão sua). Fazer do jeito seguro exige um servidor (API) entre o jogo e o banco | — |
+| 10 | Instalador .exe | **Depois da apresentação** (decisão sua). Viável com o `build_apps` do Panda3D | — |
+
+Ordem: 2 primeiro (para o coletor juntar histórico das caixas novas no fim de semana), depois 6, 5, 4, 1 e 0, depois 8 (antes dos itens 3 e 7, para eles já nascerem traduzidos), depois 3 e 7.
+
+🟦 = entregue, falta você validar · ✅ = validado por você.
 
 ### 2.2 Regras novas a partir de agora
 
@@ -270,6 +305,28 @@ Entregue em **2 partes** (o arquivo único passava do limite de envio): `cs-gach
 | `requirements.txt` | ALTERADO | `panda3d-simplepbr` passa a ser instalado sempre: o `scene_backdrop.py` já usava, e sem ele o PC do professor mostraria o cenário com outra iluminação. |
 
 ---
+
+### 6.3 Fases 4 e 5 (02/10, noite): Mercado, Inventário, venda e abertura
+
+ZIP `cs-gacha-fases-4-5.zip`, feito a partir do seu commit `3d35974`.
+
+| Arquivo | Situação | O que é |
+|---|---|---|
+| `app/view/ui_kit.py` | NOVO | Peças de interface no estilo CS2 usadas pelas telas novas: cartão de item, botões, abas, paginação, caixa de busca, janela (pop-up), aviso que some sozinho, barra de desgaste e o **gráfico de preços** (com `LineSegs`, sem biblioteca nova) |
+| `app/view/market_view.py` | NOVO | **Mercado** (Fase 4): abas CAIXAS e SKINS, painel de detalhes, compra com confirmação, busca, filtros de raridade, páginas e ▲▼ de 24 h |
+| `app/view/inventory_view.py` | REESCRITO | **Inventário** (Fase 5): itens reais, contador "x / 1.000", destaque + menu do item, pop-up de DETALHES, VENDER com valor final e confirmação |
+| `app/view/case_opening.py` | NOVO | **Abertura de caixa** com a roleta (visual do protótipo do grupo, agora com as skins reais) |
+| `app/view/game_view_base.py` | ALTERADO | Header: "MERCADO" no lugar de "LOJA", fonte Inter, item da tela atual sublinhado de laranja, saldo em R$ e `atualizar_saldo()` |
+| `app/view/home_view.py` | ALTERADO | Só informa a rota (`ROTA = "home"`) para o header destacar |
+| `app/view/login_register_view.py` | ALTERADO | **Correção de um erro meu:** a fonte Inter nunca carregava (o `loadFont` do Panda3D só aceita o caminho como texto e eu passava um `Filename`), então o login usava a fonte padrão. Agora usa a Inter de verdade, como no mockup |
+| `app/controller/market_controller.py` | ALTERADO | + `price_changes()` (▲▼ da página inteira numa consulta) e `list_rarities()` (filtros) |
+| `app/controller/inventory_controller.py` | ALTERADO | + `case_contents()` (prévia e cartões da roleta) |
+| `app/dao/skin_catalog_dao.py` | ALTERADO | + `get_history_for_listings()`: últimos 60 pontos de cada anúncio da página (usa `ROW_NUMBER()`, do MariaDB 10.2+) |
+| `app/core/game_rules.py` | ALTERADO | + `price_change()`: variação do preço em 24 h |
+| `app/controller/view_manager.py` | ALTERADO | Guarda os DAOs que as telas novas usam |
+| `main.py` | ALTERADO | Cria os DAOs e registra a rota `"shop"` (MERCADO) |
+| `app/unit_tests/test_gacha_rules.py`, `test_gacha_controllers.py` | ALTERADOS | + 7 testes (74 no total) |
+| `ROADMAP.md` | ALTERADO | Este documento |
 
 ## 7. Tutorial — Fase 2 (dados reais no banco)
 
@@ -457,7 +514,7 @@ from price_history h join collections c on c.id = h.collection_id group by c.nam
 python -m unittest app.unit_tests.test_user_flow app.unit_tests.test_gacha_rules app.unit_tests.test_gacha_controllers app.unit_tests.test_sync_market
 ```
 **Validação**
-- [ ] Termina com `Ran 67 tests` e `OK`, sem nenhum traceback e sem `ResourceWarning` no meio.
+- [ ] Termina com `Ran 74 tests` (eram 67 antes das Fases 4 e 5) e `OK`, sem nenhum traceback e sem `ResourceWarning` no meio.
 
 > Até a correção 4 apareciam 3 avisos `ResourceWarning: Implicitly cleaning up <HTTPError ...>` no Python 3.14: o importador não fechava as respostas de erro da Steam (429, 500 e 403). Não era falha de teste, mas era conexão ficando aberta; a correção 5 fecha essas respostas e tem um teste para isso.
 
@@ -584,31 +641,238 @@ O `tools/sync_market.py` monta o nome de mercado de cada item ("AK-47 | Redline 
 
 ---
 
-## 10. Fases 4 a 7 (próximos passos)
+## 10. Fases 4 a 7
 
-O backend das Fases 4 e 5 **já está pronto**: as telas só chamam os métodos abaixo. Eu escrevo o código das telas e você integra e valida, como fez hoje. Todas as telas novas seguem o **estilo CS2** (D11).
+### Tutorial — Fases 4 e 5 (Mercado, Inventário e abertura) · 30 min
 
-### Fase 4 — Tela do Mercado (`MarketView`, rota `"shop"`: o botão LOJA aparece sozinho no header)
+**Passos**
+1. Extraia `cs-gacha-fases-4-5.zip` **por cima** do projeto (mesmo esquema da T2.1). Confira com `git status`: aparecem os arquivos da seção 6.3 (3 novos em `app/view` e os alterados).
+2. Testes (com o `.venv` ativo):
+   ```bat
+   python -m unittest app.unit_tests.test_user_flow app.unit_tests.test_gacha_rules app.unit_tests.test_gacha_controllers app.unit_tests.test_sync_market
+   ```
+   - [ ] `Ran 74 tests` e `OK`.
+3. `python main.py`, entre com o seu usuário e siga os checklists abaixo. Se o saldo acabar durante os testes, coloque mais pelo DBeaver: `update users set balance = 1000 where username = 'testes';` (depois saia e entre de novo).
 
-| Tarefa | Métodos do backend | Validação |
+**T4: Mercado** (botão **MERCADO** no header)
+- [ ] O header mostra INVENTÁRIO · HOME · MERCADO, com a tela atual sublinhada de laranja e o saldo em R$ (ex.: `R$ 500,00`).
+- [ ] Aba **CAIXAS**: as 6 caixas com imagem, nome e preço em **verde** (o saldo dá) ou **vermelho** (não dá). A primeira já vem selecionada (borda laranja).
+- [ ] Painel da direita: imagem, preço da Steam com "atualizado em ...", **▲▼ em 24 h** (aparece quando o coletor já tem pontos), **gráfico do histórico** e o conteúdo por raridade **somando 100,00%**.
+- [ ] **VER TODOS OS ITENS** mostra todos os itens com a chance de cada um (◀ ▶ para as páginas). FECHAR ou ESC fecha.
+- [ ] **COMPRAR** → janela "Deseja comprar ... por R$ X?". **ENTER** confirma e **ESC** cancela. Depois de comprar, o saldo do header diminui e aparece o aviso verde embaixo.
+- [ ] Com o saldo menor que o preço: "Saldo insuficiente." em vermelho e a janela não abre.
+- [ ] Aba **SKINS**: 24 anúncios por página. Cada desgaste é um anúncio, como no mercado da Steam. Cada cartão mostra o preço e o ▲▼ de 24 h.
+- [ ] Digitar "AK" na busca filtra sozinho em meio segundo (ENTER também busca). Os filtros Mil-Spec / Restricted / Classified / Covert / ★ Especiais funcionam junto com a busca.
+- [ ] Mudar de página: ◀ ▶, **roda do mouse** ou as setas do teclado (fora da caixa de busca).
+- [ ] No painel da skin, os botões **FN / MW / FT / WW / BS** trocam o desgaste (preço, faixa de float e gráfico mudam).
+- [ ] Comprar uma skin: o aviso mostra o **float sorteado**, e ele está dentro da faixa do desgaste escolhido.
+
+**T5: Inventário** (botão **INVENTÁRIO**)
+- [ ] Contador "x / 1.000" no canto e só os seus itens. Caixas repetidas aparecem **uma vez com "x3"**. Filtros **TUDO / CAIXAS / SKINS**.
+- [ ] Clicar numa skin: ela **cresce um pouco** e ganha borda laranja, e aparece o menu **DETALHES** / **VENDER · R$ X** (o X já é o valor final, com a taxa descontada). Clicar de novo ou ESC desmarca.
+- [ ] **DETALHES**: pop-up grande com nome, raridade, desgaste, **float com 9 casas**, barra de desgaste com o marcador, preço de mercado, quanto você recebe, data em que obteve. FECHAR ou ESC fecha.
+- [ ] **VENDER**: janela com preço de mercado − taxa de 15% = **você recebe**. Ao confirmar, o item some, o saldo sobe e aparece o aviso verde.
+
+**T5: Abertura de caixa**
+- [ ] Clicar numa caixa → **ABRIR CAIXA**: tela da roleta com os itens possíveis (facas e luvas juntas num cartão dourado "★", como no CS2) e o botão **ABRIR CAIXA · chave R$ 13,50**.
+- [ ] **ABRIR** (ou ENTER): a roleta gira uns 6 segundos e para **no marcador laranja**, em cima do item ganho. Clique na roleta ou **ESPAÇO** para pular.
+- [ ] O resultado mostra o item, a raridade, o desgaste, o float e o valor. O saldo do header diminuiu R$ 13,50.
+- [ ] **ABRIR OUTRA** só aparece se ainda houver caixa igual (mostra quantas restam). **VER DETALHES** abre o pop-up do item. **ACEITAR** (ou ENTER) volta ao inventário, com a caixa a menos e a skin nova.
+- [ ] Com saldo menor que a chave: "Saldo insuficiente para a chave (R$ 13,50)." e a caixa **não** é consumida.
+
+**Commit**
+```bat
+git add -A
+git commit -m "Fases 4 e 5: Mercado, Inventario, venda e abertura de caixa com roleta"
+git push
+git tag marco-5-mvp
+git push --tags
+```
+- [ ] Push sem erro.
+
+**Se der erro:** mande o print e o terminal inteiro. Os erros do banco aparecem no terminal com a linha exata.
+
+### Extras 1 — Catálogo completo: 42 caixas + coleções de mapa (item 2) · 20 min + downloads
+
+ZIP `cs-gacha-extras-1.zip`, feito a partir do seu commit `570efa8`.
+
+| Arquivo | Situação | O que é |
 |---|---|---|
-| T4.1 Aba **CAIXAS**: grade com imagem (`item_image_path(api_id)`), nome e preço **verde/vermelho** | `list_cases()`, `can_afford(preço)` | Preço vermelho quando saldo < preço |
-| T4.2 Clicar numa caixa: painel com o **conteúdo e a chance** de cada item | `case_contents(id)` | As chances somam 100% |
-| T4.3 Comprar caixa: checagem → **"Deseja comprar por R$ X?"** → compra | `check_purchase(preço)`, `buy_case(caixa)` | Saldo do header atualiza; "Inventário cheio!" aparece |
-| T4.4 Aba **SKINS**: busca, paginação, desgaste, preço e variação desde a passada anterior (▲▼) | `list_skins(busca, página)`, `price_history(...)` | Busca "AK" filtra |
-| T4.5 Comprar skin avulsa (com confirmação) | `buy_skin(skin, anuncio)` | Skin aparece no inventário com o desgaste certo |
-| T4.6 **Gráfico do histórico** (D10) no painel da caixa ou da skin, desenhado com `LineSegs` | `price_history(...)` | Linha com os pontos coletados no fim de semana |
+| `app/migrations/003_raridades_colecoes.sql` | NOVO | Cria as raridades Consumer Grade, Industrial Grade e Contraband (chance 0: elas não saem de caixa). Não apaga nada |
+| `app/migrations/seed_base.sql` | ALTERADO | As mesmas 3 raridades, para bancos novos (ex.: PC do professor) |
+| `tools/sync_market.py` | ALTERADO | Nova opção `--colecoes`: também importa as skins que não saem de caixa (só para o mercado) |
+| `app/core/game_rules.py` | ALTERADO | Raridades novas, ordem das raridades na tela e preço estimado delas |
+| `app/controller/market_controller.py` | ALTERADO | Filtros de raridade na ordem do jogo (da mais comum para a mais rara) |
+| `app/view/market_view.py` | ALTERADO | Aba CAIXAS com 4 x 3 caixas por página; filtros de raridade numa linha própria (são 9 agora) |
+| `app/unit_tests/test_sync_market.py`, `test_gacha_controllers.py` | ALTERADOS | + 3 testes (77 no total) |
 
-### Fase 5 — Inventário, abertura e venda
+Números (conferidos com os JSON da API que vieram do seu PC): **42 caixas, 2.126 skins** (1.305 que saem de caixa + 821 de coleções) e **cerca de 9.300 anúncios**. Por isso a passada do coletor sobe de ~1h20 para **~8 h**. Itens novos têm prioridade: em uma noite todos ganham preço real.
 
-| Tarefa | Métodos | Validação |
+**Passos**
+1. Pare o coletor de preços (**Ctrl+C** no terminal dele; o progresso fica salvo).
+2. Extraia o ZIP por cima do projeto.
+3. Migração 003 (uma vez só), no **cmd**:
+   ```bat
+   C:\xampp\mysql\bin\mysql -u root -p < app\migrations\003_raridades_colecoes.sql
+   ```
+   *(ou abra o arquivo no DBeaver e execute como script, Alt+X)*
+   - [ ] A conferência no fim mostra **8 raridades**.
+4. Importe o catálogo completo e as imagens (sem preços; uns 5 min por causa das ~1.800 imagens novas):
+   ```bat
+   python tools/sync_market.py --todas --colecoes --imagens --sem-precos
+   ```
+   - [ ] Termina com "Pronto!" e mostra `Gravando 42 caixas e 2126 skins` e `+ 821 skins de coleções`.
+5. Testes: `python -m unittest app.unit_tests.test_user_flow app.unit_tests.test_gacha_rules app.unit_tests.test_gacha_controllers app.unit_tests.test_sync_market`
+   - [ ] `Ran 77 tests` e `OK`.
+6. `python main.py` → MERCADO:
+   - [ ] Aba CAIXAS: 12 caixas por página, **4 páginas**, todas com imagem.
+   - [ ] Aba SKINS: 9 filtros (Todas, Consumer, Industrial, Mil-Spec, Restricted, Classified, Covert, Contraband, ★ Especiais). "Consumer" mostra skins de coleção (ex.: AUG \| Colony).
+   - [ ] O inventário e as caixas antigas continuam iguais (nada se perdeu).
+7. Volte a ligar o coletor: `python tools/sync_market.py --so-precos --continuo`
+   - [ ] A primeira passada mostra cerca de 9.300 preços (~8 h).
+8. Commit (as imagens novas vão junto, ~90 MB; o push demora um pouco):
+   ```bat
+   git add -A
+   git commit -m "Extras 1: catalogo completo (42 caixas + colecoes de mapa)"
+   git push
+   ```
+
+**Se der erro:** "Raridades ausentes no banco: {'Consumer Grade', ...}" → a migração 003 não rodou (passo 3).
+
+### Extras 2 — Busca, Ctrl+A, skin maior, compra múltipla e "Minha conta" (itens 6, 5, 4, 1 e 0) · 25 min
+
+ZIP `cs-gacha-extras-2.zip`, feito a partir do seu commit `570efa8`. **Sem migração e sem biblioteca nova.**
+
+> **Ordem dos ZIPs:** faça o **Extras 1 antes** (migração 003 e importação). Este ZIP também traz os arquivos do Extras 1 (ele é feito a partir do `570efa8`), então extrair os dois não dá problema, **desde que o do Extras 2 seja o último**.
+
+| Arquivo | Situação | O que é |
 |---|---|---|
-| T5.1 Inventário real (caixas agrupadas "x3" + skins), cards com faixa da cor da raridade e contador "37/1000" | `load()`, `status()` | Mostra só os itens do jogador |
-| T5.2 Clicar na skin: destaque + botão **DETALHES** → pop-up (nome, float, desgaste, valor, fechar) | `Skin_Instance.float_value`, `wear_label`, `skin_price` | Pop-up fecha |
-| T5.3 **Vender**: valor final → confirmação → venda | `sale_quote(id)`, `sell_skin(id)` | Item some e saldo sobe |
-| T5.4 **Abrir caixa** com a roleta do protótipo (`prototypes/roleta_prototype.py`): chama `open_case` **antes** e monta a roleta parando no item recebido; cor por raridade (`rarity.color_rgba`) | `open_case(id)` → `Drop_Result` | Botões **ACEITAR** e **ABRIR OUTRA** (só se `can_open_another`) |
+| `app/dao/skin_catalog_dao.py` | ALTERADO | **Busca por palavras** (`search_filters`): cada palavra precisa aparecer no nome, em qualquer ordem; hífen e espaço não atrapalham ("ak47" acha "AK-47") |
+| `app/dao/inventory_dao.py` | ALTERADO | `buy_case(..., quantity)` e `buy_skins(...)`: **várias unidades numa transação só** (tudo ou nada; `executemany`) |
+| `app/controller/market_controller.py` | ALTERADO | Quantidade de **1 a 50 por compra** (conferida antes de ir ao banco), `max_quantity()` (limite, saldo e espaço livre) e `buy_skins()` (cada unidade com o seu float) |
+| `app/controller/user_controller.py` | ALTERADO | `update()` só muda os dados da sessão **depois** que o banco aceita (e-mail de outra conta não aparece no header por engano) |
+| `app/view/account_window.py` | NOVO | Pop-up **MINHA CONTA**: nome, e-mail, nova senha (opcional) e saldo |
+| `app/view/game_view_base.py` | ALTERADO | O nome no header vira botão (fica laranja com o mouse em cima) e abre "Minha conta" |
+| `app/view/ui_kit.py` | ALTERADO | `SelecionarTudo` (**Ctrl+A**) e limite de letras nas caixas de texto (o mesmo das colunas do banco) |
+| `app/view/login_register_view.py` | ALTERADO | Ctrl+A nos campos do login e do cadastro |
+| `app/view/market_view.py` | ALTERADO | Janela de compra com **quantidade** (− / + / MÁX e setas ↑↓), **imagem maior** no painel com **clique para ampliar**, Ctrl+A na busca |
+| `app/view/inventory_view.py` | ALTERADO | ESC, ENTER, ESPAÇO, setas e roda do mouse não agem por baixo do "Minha conta" |
+| `app/unit_tests/test_gacha_controllers.py`, `test_user_flow.py` | ALTERADOS | + 7 testes (84 no total) |
+| `ROADMAP.md` | ALTERADO | Este documento |
 
-Filtros do inventário: sugiro trocar as 7 categorias atuais por **TUDO / CAIXAS / SKINS** (as outras eram do escopo cortado).
+**Passos**
+1. Extraia o ZIP por cima do projeto (depois do Extras 1).
+   - [ ] Existe o arquivo novo `app/view/account_window.py`.
+2. Testes: `python -m unittest app.unit_tests.test_user_flow app.unit_tests.test_gacha_rules app.unit_tests.test_gacha_controllers app.unit_tests.test_sync_market`
+   - [ ] `Ran 84 tests` e `OK`.
+3. `python main.py` → **login (Ctrl+A)**:
+   - [ ] Digite algo no usuário e aperte **Ctrl+A**: aparece um fundo laranja atrás do texto. Digite uma letra: fica **só a letra**.
+   - [ ] Ctrl+A e **Backspace** (ou **Delete**): apaga tudo.
+   - [ ] Ctrl+A e **←** (ou **Home** / **End**): o texto **continua** e só o fundo laranja some. Clicar na caixa ou apertar TAB também desmarca.
+   - [ ] Na senha também funciona (marca os ****).
+4. Entre e vá ao **MERCADO → SKINS (busca e imagem)**:
+   - [ ] Pesquise `ak inheritance`, depois `ak-47 inheritance` e `inheritance ak47`: aparece **só a AK-47 | Inheritance** (um cartão por desgaste).
+   - [ ] Na busca, Ctrl+A + Backspace limpa o texto.
+   - [ ] A imagem do painel da direita está **maior**. Clique nela: abre a imagem grande; clique, ENTER ou ESC fecham.
+5. **Compra múltipla**:
+   - [ ] Aba CAIXAS → COMPRAR: a janela mostra **QUANTIDADE** com − / + / **MÁX (n)**; as setas **↑↓** também mudam. O **Total** = preço × quantidade e o botão diz "COMPRAR 4x" (por exemplo).
+   - [ ] Confirme 4 caixas: mensagem "4x ... comprada!", o saldo do header desconta 4 vezes e o Inventário mostra a caixa com **x4** (ou +4 se já tinha).
+   - [ ] Aba SKINS → compre **3** unidades de uma skin: entram 3 itens no Inventário e o **DETALHES** de cada um mostra um **float diferente** (todos dentro do desgaste comprado).
+   - [ ] Com pouco saldo, **MÁX** para no que o saldo paga.
+6. **Minha conta** (item 0 da documentação: "visualizar e editar seus dados"):
+   - [ ] Passe o mouse no seu nome no header (fica laranja) e clique: abre **MINHA CONTA** com nome, e-mail e saldo.
+   - [ ] Troque o e-mail para o de **outra** conta e SALVAR: mensagem vermelha "Erro: E-mail já cadastrado." e o header **não** muda.
+   - [ ] Troque o **nome** e SALVAR (ou ENTER): mensagem verde e o header mostra o nome novo.
+   - [ ] Digite uma **nova senha** e SALVAR: a senha some da caixa. SAIR → entre com a senha nova: funciona. *(Salvar com a senha em branco mantém a atual.)*
+   - [ ] No **Inventário**, selecione um item, abra "Minha conta" e aperte **ESC**: fecha só a janela; o item continua selecionado.
+7. Commit:
+   ```bat
+   git add -A
+   git commit -m "Extras 2: busca por palavras, Ctrl+A, skin ampliada, compra multipla e Minha conta"
+   git push
+   ```
+
+**Como explicar na apresentação**
+- **Busca:** o texto vira uma condição por palavra (`nome LIKE %palavra%`), todas obrigatórias. Uma segunda comparação tira hífen e espaço do nome (`REPLACE`) para "ak47" achar "AK-47". Tudo com parâmetros (`%s`), sem montar SQL com o texto do usuário.
+- **Compra múltipla:** é a mesma transação da compra de uma unidade, só que com N linhas (`executemany`). Se qualquer coisa falhar (saldo, espaço, preço mudou), nada é gravado (rollback).
+- **Ctrl+A:** a caixa de texto do Panda3D não tem seleção. O jogo guarda que o texto está "marcado" e desenha o fundo laranja; a próxima letra troca o texto inteiro. Detalhe técnico: a caixa avisa "digitou" também quando o cursor anda (setas), e só a tecla de uma letra vem com o código da tecla; é isso que separa "substituir" de "só desmarcar".
+- **Minha conta:** a janela é só a "view"; a validação (e-mail, nome sem "@", senha com hash) é a mesma do cadastro, no `User_Controller`.
+
+**Se der erro:** mande o print e o terminal inteiro. Se só a busca falhar com erro de SQL perto de `REPLACE`, mande também a versão do banco (`select version();`).
+
+### Extras 3 — Português e inglês, com US$ (item 8) · 20 min
+
+ZIP `cs-gacha-extras-3.zip`, feito a partir do seu commit `570efa8` (já traz os Extras 1 e 2: **extraia depois deles**). **Sem migração e sem biblioteca nova.**
+
+| Arquivo | Situação | O que é |
+|---|---|---|
+| `app/core/i18n.py` | NOVO | O "motor" dos idiomas: `t("texto em português")` devolve o texto no idioma atual; troca e guarda o idioma escolhido; números e datas no formato de cada idioma |
+| `app/core/i18n_en.py` | NOVO | As traduções para o inglês (o texto em português é a chave) |
+| `app/core/game_rules.py` | ALTERADO | `format_money` mostra **US$** em inglês, convertendo pela cotação `BRL_PER_USD = 5.22` (dólar comercial de 01/10/2026); nomes de desgaste no idioma ("Testada em Campo" / "Field-Tested") |
+| `app/view/login_register_view.py` | ALTERADO | Textos traduzidos e **PT \| EN** embaixo do formulário |
+| `app/view/game_view_base.py` | ALTERADO | Menu e SAIR traduzidos e **PT \| EN** no header, antes do SAIR |
+| `app/view/ui_kit.py` | ALTERADO | `seletor_idioma()` (o PT \| EN), abas traduzidas, números com vírgula ou ponto |
+| `app/view/market_view.py`, `inventory_view.py`, `case_opening.py`, `account_window.py`, `home_view.py` | ALTERADOS | Textos com `t(...)`; os totais da tela "fecham" também em dólar (4 × US$ 1.45 = US$ 5.80) |
+| `app/controller/*.py`, `app/dao/inventory_dao.py`, `app/dao/user_dao.py`, `app/models/user.py`, `app/core/drop_service.py` | ALTERADOS | Mensagens para o jogador com `t(...)` |
+| `main.py` | ALTERADO | Abre no idioma escolhido da última vez |
+| `app/unit_tests/test_i18n.py` | NOVO | 13 testes (97 no total) |
+| `ROADMAP.md` | ALTERADO | Este documento |
+
+**Passos**
+1. Extraia o ZIP por cima do projeto (depois dos Extras 1 e 2).
+   - [ ] Existem os arquivos novos `app/core/i18n.py` e `app/core/i18n_en.py`.
+2. Testes (agora com o `test_i18n`):
+   ```bat
+   python -m unittest app.unit_tests.test_i18n app.unit_tests.test_user_flow app.unit_tests.test_gacha_rules app.unit_tests.test_gacha_controllers app.unit_tests.test_sync_market
+   ```
+   - [ ] `Ran 97 tests` e `OK`.
+3. `python main.py` → **login**:
+   - [ ] Embaixo do formulário aparece **PT | EN** (PT em laranja).
+   - [ ] Clique em **EN**: SIGN IN, Username, Password, "Don't have an account? Sign up".
+   - [ ] Senha errada: "Invalid username or password." / no cadastro, nome com "@": "Error: The username cannot contain @.".
+4. Entre:
+   - [ ] Header: INVENTORY · HOME · MARKET, **PT | EN** (EN em laranja) e LOG OUT. O saldo aparece em **US$** (R$ 500,00 = US$ 95.79).
+5. **MARKET**:
+   - [ ] Abas CASES / SKINS, preços em US$, filtros "All · Consumer · … · ★ Special", desgastes "Factory New", "Field-Tested"...
+   - [ ] COMPRAR 4 caixas: CONFIRM PURCHASE, QUANTITY, **BUY 4x**; o Total é 4 × o preço da unidade mostrado. Depois: "4x … purchased! Balance: US$ …".
+   - [ ] Sem saldo: "Insufficient balance.".
+6. **INVENTORY**: OPEN CASE / SEE CONTENTS, abertura (OPEN CASE · key US$ 2.59, YOU GOT, ACCEPT), DETAILS (WEAR, VALUE, "Obtained on mm/dd/aaaa"), SELL (CONFIRM SALE, Market fee, You get). Nome do jogador no header → MY ACCOUNT.
+7. **O idioma fica salvo**: feche o jogo e abra de novo → abre em inglês. Clique em **PT** (no header ou no login) → tudo volta ao português e em **R$**.
+8. Commit:
+   ```bat
+   git add -A
+   git commit -m "Extras 3: portugues e ingles (US$ com cotacao configuravel)"
+   git push
+   ```
+
+**O que continua igual nos dois idiomas (de propósito)**
+- **Nomes das skins, caixas e raridades** ("AK-47 | Redline", "Covert"): são os nomes oficiais do jogo, como já eram. Só o grupo das facas/luvas tem nome traduzido ("★ Item Especial Raro" / "★ Rare Special Item").
+- **A frase pintada na imagem de fundo do login** ("ABRA CAIXAS / CONQUISTE SKINS / FAÇA PARTE DA SORTE"): faz parte da arte. Para traduzir, precisaria de uma segunda imagem.
+- **O banco continua em reais.** O dólar é só exibição: cada valor é convertido na hora de mostrar, por isso o saldo do header pode diferir 1 centavo da soma das compras. Para mudar a cotação: `BRL_PER_USD` em `app/core/game_rules.py`.
+- Mensagens do **terminal** (logs, importador, autoteste) ficam em português.
+- Trocar o idioma **redesenha a tela**: no mercado volta à aba CAIXAS e à página 1; no login, o que foi digitado é apagado.
+
+**Como explicar na apresentação**
+- **Uma função só:** todo texto da tela passa por `t("...")`. O texto em português é a chave do dicionário de inglês; sem tradução, aparece o português (o jogo não quebra) e o terminal avisa.
+- **Teste que protege a tradução:** o `test_i18n` lê o código e falha se alguém escrever um `t("...")` novo sem colocar a tradução, ou com valores (`{nome}`) diferentes.
+- **Dinheiro:** o banco guarda reais (`DECIMAL`). Só a exibição converte, com uma cotação fixa e configurável, para não depender de internet na apresentação.
+
+**Se der erro:** mande o print e o terminal inteiro.
+
+### Plano das Fases 4 e 5 (o que foi pedido e onde está)
+
+| Tarefa | Onde está | Situação |
+|---|---|---|
+| T4.1 Aba CAIXAS com preço verde/vermelho | `market_view.py` `_desenhar_caixas` | 🟦 entregue |
+| T4.2 Conteúdo e chance de cada item | painel + VER TODOS OS ITENS | 🟦 entregue |
+| T4.3 Comprar caixa com confirmação | `_comprar_caixa` → `buy_case` | 🟦 entregue |
+| T4.4 Aba SKINS: busca, páginas, desgaste, ▲▼ | `_carregar_skins` + `price_changes` | 🟦 entregue (▲▼ de 24 h, mais útil que "desde a passada anterior") |
+| T4.5 Comprar skin avulsa | `_comprar_skin` → `buy_skin` | 🟦 entregue |
+| T4.6 Gráfico do histórico (D10) | `ui_kit.grafico` | 🟦 entregue |
+| T5.1 Inventário real, "x3", contador | `inventory_view.py` | 🟦 entregue |
+| T5.2 Destaque + DETALHES | `_selecionar`, `_abrir_detalhes` | 🟦 entregue |
+| T5.3 Vender com valor final e confirmação | `_vender` | 🟦 entregue |
+| T5.4 Abrir caixa com a roleta | `case_opening.py` | 🟦 entregue |
 
 ### Fase 6 — Home viva e extras (D11, D12)
 
@@ -633,10 +897,10 @@ Filtros do inventário: sugiro trocar as 7 categorias atuais por **TUDO / CAIXAS
 
 | Dia | Eu (código) | Você (integrar e validar) |
 |---|---|---|
-| **Sex 02/10** | Correção 3 (modo contínuo) ✅ · Correção 4 (cenário no login + Mirage recortada) ✅ | Extrair a correção 4 (2 partes; já inclui a 3) · T3.5 · push · **deixar o coletor contínuo rodando** (T2.6) · **PC do professor** (12.1) |
-| **Sáb 03/10** | Fase 4 (Mercado estilo CS2 + gráfico) | Integrar a Fase 4 e mandar prints |
-| **Dom 04/10** | Fase 5 (Inventário, abertura com roleta, venda) | Integrar → **MVP completo** |
-| **Seg 05/10** | Fase 6: Home viva + vitrine "equipar" | Integrar à noite |
+| **Sex 02/10** | Correções 3, 4 e 5 ✅ · Fases 4 e 5 ✅ · **Extras 1** (catálogo completo) ✅ · **Extras 2** (busca, Ctrl+A, skin maior, compra múltipla, Minha conta) ✅ · **Extras 3** (português/inglês) ✅ | Fases 4 e 5 validadas ✅ · **Extras 1** (para o coletor pegar as caixas novas) |
+| **Sáb 03/10** | **Extras 4** (Home viva, caixa grátis) | Integrar Extras 2 e 3 |
+| **Dom 04/10** | Ajustes do que você encontrar nos Extras 2 a 4 | Integrar Extras 4 |
+| **Seg 05/10** | Folga para correções | — |
 | **Ter–Qua 06–07/10** | Ajustes finos e correções; slides com você | Roteiro de aceite, slides, vídeo |
 | **Qui 08/10** | **Congelar o código** | Dump do banco com o histórico → PC do professor (12.2) · ensaiar |
 | **Sex 09/10** | — | Apresentação |
@@ -711,6 +975,17 @@ Depois leve o banco **pronto** do seu PC, que já tem os preços reais **e o his
 | `WARNING ... simplepbr não instalado` | Falta o `panda3d-simplepbr` | `pip install -r requirements.txt` |
 | Home presa em "Carregando cenário..." | Arquivo do mapa faltando ou que não abriu | Procure no terminal `Asset não encontrado` (extraia o ZIP de novo / `git pull`) ou `Não foi possível carregar` (mande o terminal) |
 | Home com o mapa mas sem o personagem (ou o contrário) | Um dos dois `.glb` não abriu | Mesma busca no terminal; o jogo segue funcionando |
+| Não aparece o botão MERCADO | `main.py` antigo | Extraia o ZIP das Fases 4 e 5 de novo (o `main.py` registra a rota `"shop"`) |
+| Mercado: "Nenhuma caixa à venda ainda." | Catálogo não importado neste banco | `python tools/sync_market.py --sem-precos` (T2.4) |
+| Mercado: gráfico "Ainda sem histórico" | O coletor ainda não gravou pontos daquele item | Deixe a T2.6 rodando; cada passada acrescenta um ponto |
+| Erro de SQL perto de `OVER (PARTITION BY` | MariaDB/MySQL antigo (antes do 10.2 / 8.0) | Mande a versão (`select version();`); o XAMPP atual tem o 10.4 |
+| "O preço mudou para R$ X. Confira e tente de novo." | O coletor atualizou o preço enquanto a janela estava aberta | Normal: a tela recarrega com o preço novo; compre de novo |
+| Busca do mercado não acha uma skin | Alguma palavra digitada não está no nome (ex.: o nome em português) | A busca usa o nome em inglês do jogo; todas as palavras precisam aparecer (em qualquer ordem) |
+| "Minha conta": "Erro: E-mail já cadastrado." (ou "Nome de usuário já cadastrado.") | O e-mail ou o nome é de outra conta | Esperado; os seus dados não mudam |
+| Ctrl+A não marca nada | O cursor não está na caixa de texto (ou ela está vazia) | Clique na caixa e aperte Ctrl+A de novo |
+| Em inglês, algum texto aparece em português | Texto sem tradução (o terminal mostra `Sem tradução para o inglês: '...'`) | Mande a linha do terminal; a tela segue funcionando com o texto em português |
+| Os valores em dólar parecem altos/baixos | Cotação fixa em `app/core/game_rules.py` (`BRL_PER_USD = 5.22`) | Troque o número (só muda a exibição; o banco continua em reais) |
+| O jogo abre sempre em inglês | O idioma escolhido fica salvo | Clique em **PT** no login ou no header (ou apague a pasta `.cs_gacha` dentro da sua pasta de usuário) |
 
 ---
 

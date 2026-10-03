@@ -18,7 +18,7 @@ O link embaixo do botão alterna entre os dois.
 """
 import logging
 
-from direct.gui.DirectGui import DGG, DirectButton, DirectEntry
+from direct.gui.DirectGui import DGG, DirectButton, DirectEntry, DirectFrame
 from direct.gui.OnscreenImage import OnscreenImage
 from direct.gui.OnscreenText import OnscreenText
 from direct.showbase.DirectObject import DirectObject
@@ -33,7 +33,10 @@ from panda3d.core import (
 
 from app.controller.login_controller import Login_Controller
 from app.controller.user_controller import User_Controller
-from app.core.paths import FONTS_DIR, UI_DIR
+from app.core import i18n
+from app.core.i18n import t
+from app.core.paths import UI_DIR
+from app.view.ui_kit import COR_SELECAO, KitUI, SelecionarTudo, fonte_inter
 
 logger = logging.getLogger(__name__)
 
@@ -70,8 +73,11 @@ LAYOUT = {
         "botao": 742.5, "link": 801.5, "msg": 841,
     },
 }
+# "PT | EN": preso à borda de baixo da JANELA (não da arte de fundo, que é cortada
+# em janelas muito largas), um pouco acima dela. Em 16:9 fica embaixo do formulário.
+SELETOR_IDIOMA_Z = 0.087
 
-# nome do campo: (texto de exemplo, ícone, é senha?)
+# nome do campo: (texto de exemplo, ícone, é senha?). Os textos passam por t() ao desenhar.
 CAMPOS = {
     "usuario": ("Usuário", "icon_user.png", False),
     "email": ("E-mail", "icon_mail.png", False),
@@ -116,6 +122,7 @@ class LoginRegisterView:
         self.campos = {}             # nome -> {"no", "entry", "placeholder", "foco", "mostrando_ph"}
         self.modo = "login"
         self.raiz = None
+        self.borda_baixo = None      # nó na borda de baixo da janela (seletor de idioma)
         self.eventos = DirectObject()  # recebe eventos de teclado/janela desta tela
 
     # ==================================================================
@@ -130,10 +137,18 @@ class LoginRegisterView:
         self.login_controller = Login_Controller(user_dao, self, self._ao_autenticar)
         self.user_controller = User_Controller(user_dao, self, self._ao_cadastrar)
 
-        self.fonte = self._fonte("Inter-Regular.otf")
-        self.fonte_bold = self._fonte("Inter-Bold.otf")
+        # Fonte Inter na resolução certa para o tamanho dos textos desta tela
+        # (detalhes em ui_kit.fonte_inter). Sem o arquivo, usa a fonte padrão.
+        self.fonte = fonte_inter(self.app, negrito=False, escala=FONTE_CAMPO * PX)
+        self.fonte_bold = fonte_inter(self.app, negrito=True, escala=FONTE_BOTAO * PX)
         if self.fonte_bold is None:
             self.fonte_bold = self.fonte
+
+        # Ctrl+A nos campos (o campo de texto do Panda3D não tem seleção; ver ui_kit)
+        self.selecao = SelecionarTudo()
+        self.medidor = TextNode("medidor_login")
+        if self.fonte is not None:
+            self.medidor.setFont(self.fonte)
 
         # Tudo fica dentro da raiz, que é escalada junto com o fundo.
         self.raiz = self.ui_root.attachNewNode("tela_login")
@@ -146,6 +161,13 @@ class LoginRegisterView:
             self._criar_campo(nome)
         self._criar_botao()
         self._criar_link()
+
+        # Idioma (PT | EN): trocar redesenha o login no idioma novo.
+        # O nó é criado depois do fundo para ficar por cima dele; _ajustar_escala o leva à borda de baixo.
+        self.kit = KitUI(self.app)
+        self.borda_baixo = self.ui_root.attachNewNode("login_borda_baixo")
+        self.elementos.append(self.kit.seletor_idioma(self.borda_baixo, 0, SELETOR_IDIOMA_Z,
+                                                      self._trocar_idioma, escala=FONTE_LINK * PX))
 
         self.msg = OnscreenText(
             text="",
@@ -191,7 +213,7 @@ class LoginRegisterView:
         self._imagem(icone, no, ICONE_TAM, ICONE_TAM, x_px=ICONE_DX)
 
         placeholder = OnscreenText(
-            text=texto_exemplo,
+            text=t(texto_exemplo),
             parent=no,
             pos=(TEXTO_DX * PX, -BASE_CAMPO * PX),
             scale=FONTE_CAMPO * PX,
@@ -205,6 +227,18 @@ class LoginRegisterView:
         # Largura da área de digitação (no campo de senha, para antes do olho).
         limite_direito = OLHO_DX - 22 if eh_senha else CAMPO_W / 2 - 16
         largura = (limite_direito - TEXTO_DX) / FONTE_CAMPO
+
+        # Fundo laranja do texto marcado com Ctrl+A (fica escondido; vem antes da
+        # caixa de digitação para ficar ATRÁS das letras).
+        destaque = DirectFrame(
+            parent=no,
+            frameColor=COR_SELECAO,
+            frameSize=(TEXTO_DX * PX, TEXTO_DX * PX,
+                       (-BASE_CAMPO - FONTE_CAMPO * 0.28) * PX, (-BASE_CAMPO + FONTE_CAMPO * 0.95) * PX),
+            state=DGG.DISABLED,
+        )
+        destaque.hide()
+        self.elementos.append(destaque)
 
         entry = DirectEntry(
             parent=no,
@@ -237,6 +271,11 @@ class LoginRegisterView:
         entry.setFrameSize()
         self.elementos.append(entry)
 
+        # Ctrl+A: com o texto marcado, a próxima tecla substitui tudo e o Backspace apaga tudo
+        limite_px = (limite_direito - TEXTO_DX) * PX
+        self.selecao.registrar(entry, destaque,
+                               lambda texto: min(self.medidor.calcWidth(texto) * FONTE_CAMPO * PX, limite_px))
+
         if eh_senha:
             self.tex_olho = self._textura("icon_eye.png")
             self.tex_olho_fechado = self._textura("icon_eye_off.png")
@@ -268,7 +307,7 @@ class LoginRegisterView:
         opcoes = dict(
             parent=self.raiz,
             frameSize=(-meia_l, meia_l, -meia_a, meia_a),
-            text="ENTRAR",
+            text=t("ENTRAR"),
             text_font=self.fonte_bold,
             text_fg=COR_BOTAO_TEXTO,
             text_scale=FONTE_BOTAO * PX,
@@ -338,18 +377,6 @@ class LoginRegisterView:
         self.elementos.append(imagem)
         return imagem
 
-    def _fonte(self, arquivo):
-        """Carrega uma fonte de app/assets/fonts. Se falhar, usa a fonte padrão do Panda3D."""
-        caminho = FONTS_DIR / arquivo
-        try:
-            fonte = self.app.loader.loadFont(Filename.fromOsSpecific(str(caminho)))
-        except Exception:
-            logger.warning("Fonte não carregada: %s (usando a padrão)", caminho)
-            return None
-        if hasattr(fonte, "setPixelsPerUnit"):
-            fonte.setPixelsPerUnit(48)        # letras mais nítidas
-        return fonte
-
     # ==================================================================
     # MODOS, FOCO E TECLADO
     # ==================================================================
@@ -371,7 +398,7 @@ class LoginRegisterView:
         # a senha nunca é mantida ao trocar de modo
         self.campos["senha"]["entry"].enterText("")
 
-        texto_botao, texto_link, texto_destaque = TEXTOS[modo]
+        texto_botao, texto_link, texto_destaque = (t(texto) for texto in TEXTOS[modo])
         self.btn_principal["text"] = texto_botao
         self.btn_principal.setPos(0, 0, _z(layout["botao"]))
 
@@ -386,9 +413,15 @@ class LoginRegisterView:
         self._definir_modo("register" if self.modo == "login" else "login")
         self._focar("usuario")
 
+    def _trocar_idioma(self, codigo):
+        """PT | EN: troca o idioma e desenha o login de novo (os textos são lidos ao desenhar)."""
+        i18n.definir_idioma(codigo)
+        self.view_manager.mudar_tela_base(self.view_manager.ROTA_LOGIN)
+
     def _alternar_senha(self):
         """Ícone de olho: mostra/esconde a senha."""
         entry = self.campos["senha"]["entry"]
+        self.selecao.desmarcar_todos()      # a marcação do Ctrl+A tinha a largura dos ****
         vai_mostrar = bool(entry["obscured"])
         entry["obscured"] = 0 if vai_mostrar else 1
         imagem = self.tex_olho_fechado if vai_mostrar else self.tex_olho
@@ -470,7 +503,7 @@ class LoginRegisterView:
         self._definir_modo("login")
         self.campos["usuario"]["entry"].enterText(user.username)
         self._focar("senha")
-        self.show_message("Conta criada! Digite sua senha para entrar.")
+        self.show_message(t("Conta criada! Digite sua senha para entrar."))
 
     # ==================================================================
     # TAMANHO DA JANELA E DESTRUIÇÃO
@@ -488,9 +521,12 @@ class LoginRegisterView:
             meia_largura, meia_altura = 1.0, 1.0 / proporcao
         escala = max(meia_largura / (ARTE_W / ARTE_H), meia_altura)
         self.raiz.setScale(escala)
+        if self.borda_baixo is not None:
+            self.borda_baixo.setZ(-meia_altura)      # borda de baixo da janela
 
     def destruir(self):
         self.eventos.ignoreAll()
+        self.selecao.destruir()
         self.app.taskMgr.remove(TASK_PLACEHOLDER)
         self.app.taskMgr.remove(TASK_PRECARREGAR)
         for elemento in self.elementos:
@@ -500,3 +536,6 @@ class LoginRegisterView:
         if self.raiz is not None:
             self.raiz.removeNode()
             self.raiz = None
+        if self.borda_baixo is not None:
+            self.borda_baixo.removeNode()
+            self.borda_baixo = None

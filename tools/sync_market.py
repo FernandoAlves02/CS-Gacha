@@ -217,6 +217,37 @@ def build_catalog(cases, skins_by_id, skins_by_name):
     return caixas, skins, ligacoes, avisos
 
 
+def market_only_skins(skins_json, all_cases):
+    """Skins que NÃO saem de nenhuma caixa (coleções de mapa, souvenirs...).
+
+    Elas entram só no MERCADO (não dá para abrir). all_cases deve ser a lista
+    de TODAS as caixas da API, para nenhuma skin de caixa ser tratada como de coleção.
+    """
+    nas_caixas = {
+        entry["id"]
+        for case in all_cases
+        for entry in (case.get("contains") or []) + (case.get("contains_rare") or [])
+    }
+    return [skin for skin in skins_json or [] if skin.get("id") and skin["id"] not in nas_caixas]
+
+
+def add_market_only_skins(skins, extras, skins_by_id, skins_by_name, avisos):
+    """Acrescenta ao catálogo as skins de coleção (sem ligação com caixa). Devolve quantas entraram."""
+    antes = len(skins)
+    for entry in extras:
+        nome = entry.get("name") or ""
+        api_rarity = (entry.get("rarity") or {}).get("name")
+        if nome.startswith("★") or api_rarity == "Extraordinary":
+            rarity_name = rules.SPECIAL_RARITY_NAME          # facas e luvas, como nas caixas
+        else:
+            rarity_name = rules.API_RARITY_TO_DB.get(api_rarity) or rules.MARKET_ONLY_RARITIES.get(api_rarity)
+        if rarity_name is None:
+            avisos.append(f"'{nome}' ignorado (raridade {api_rarity}).")
+            continue
+        _add_skin(skins, entry, rarity_name, skins_by_id, skins_by_name, avisos)
+    return len(skins) - antes
+
+
 def _add_skin(skins, entry, rarity_name, skins_by_id, skins_by_name, avisos):
     base_id = entry["id"]
     phase = entry.get("phase")                     # fases da Doppler (Phase 1, Ruby...)
@@ -698,6 +729,8 @@ def main(argv=None):
     parser.add_argument("--listar", action="store_true", help="lista as caixas disponíveis na API e sai")
     parser.add_argument("--caixas", nargs="+", metavar="NOME", help="nomes das caixas a importar")
     parser.add_argument("--todas", action="store_true", help="importa todas as caixas da API")
+    parser.add_argument("--colecoes", action="store_true",
+                        help="também importa as skins que não saem de caixas (coleções de mapa), só para o mercado")
     parser.add_argument("--imagens", action="store_true", help="baixa as imagens para app/assets/items")
     parser.add_argument("--sem-precos", action="store_true", help="não consulta a Steam (preços estimados)")
     parser.add_argument("--so-precos", action="store_true", help="só atualiza preços (não baixa o catálogo)")
@@ -731,6 +764,9 @@ def main(argv=None):
         skins_json, _ = download(CATALOG_URL.format(arquivo="skins.json"), "skins.json")
         by_id, by_name = index_skins(skins_json)
         caixas, skins, ligacoes, avisos = build_catalog(selected, by_id, by_name)
+        if args.colecoes:
+            extras = add_market_only_skins(skins, market_only_skins(skins_json, all_cases), by_id, by_name, avisos)
+            print(f"    + {extras} skins de coleções (só no mercado)")
         for aviso in avisos[:15]:
             print(f"  ! {aviso}")
         if len(avisos) > 15:

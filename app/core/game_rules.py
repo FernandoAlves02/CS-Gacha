@@ -8,8 +8,14 @@ testar (veja app/unit_tests/test_gacha_rules.py).
 
 Dinheiro usa Decimal (nunca float) para não ter erro de arredondamento,
 igual à coluna DECIMAL(10,2) do banco.
+
+Os nomes mostrados na tela (dinheiro, desgaste, raridade) seguem o idioma
+escolhido (app/core/i18n.py); os valores guardados no banco não mudam.
 """
+from datetime import timedelta
 from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
+
+from app.core import i18n
 
 CENT = Decimal("0.01")                 # precisão do dinheiro (2 casas)
 FLOAT_STEP = Decimal("0.000000001")    # precisão do float (9 casas, coluna DECIMAL(11,9))
@@ -26,6 +32,12 @@ INVENTORY_LIMIT = 1000
 # ======================================================================
 
 CURRENCY_SYMBOL = "R$"
+
+# Em inglês os valores aparecem em dólar, convertidos por esta cotação.
+# O banco continua em reais: só a EXIBIÇÃO muda. Ajuste quando quiser
+# (dólar comercial de 01/10/2026: R$ 5,22).
+CURRENCY_SYMBOL_USD = "US$"
+BRL_PER_USD = Decimal("5.22")
 
 # Preço da chave cobrada ao ABRIR uma caixa. No CS a chave custa US$ 2,49;
 # aqui usamos um valor aproximado em reais. Coloque Decimal("0.00") para
@@ -52,6 +64,27 @@ API_RARITY_TO_DB = {
     "Restricted": "Restricted",
     "Classified": "Classified",
     "Covert": "Covert",
+}
+
+# Raridades que só existem nas COLEÇÕES de mapa (não saem de nenhuma caixa).
+# Skins delas entram só no MERCADO (importador com --colecoes; migração 003).
+MARKET_ONLY_RARITIES = {
+    "Consumer Grade": "Consumer Grade",
+    "Industrial Grade": "Industrial Grade",
+    "Contraband": "Contraband",
+}
+
+# Ordem das raridades na interface (da mais comum para a mais rara).
+RARITY_ORDER = [
+    "Consumer Grade", "Industrial Grade", "Mil-Spec Grade", "Restricted",
+    "Classified", "Covert", "Contraband", SPECIAL_RARITY_NAME,
+]
+
+# Na tela as raridades aparecem com o nome oficial do jogo (o mesmo do banco), nos
+# dois idiomas. Só o grupo das facas e luvas tem nome próprio: (nome, nome curto dos filtros)
+SPECIAL_RARITY_LABELS = {
+    "pt": ("★ Item Especial Raro", "★ Especiais"),
+    "en": ("★ Rare Special Item", "★ Special"),
 }
 
 # ======================================================================
@@ -85,6 +118,9 @@ WEAR_ORDER = [w[0] for w in WEARS] + [NO_WEAR]
 # ======================================================================
 
 RARITY_BASE_PRICE = {
+    "Consumer Grade": Decimal("0.10"),
+    "Industrial Grade": Decimal("0.30"),
+    "Contraband": Decimal("8000.00"),
     "Mil-Spec Grade": Decimal("0.80"),
     "Restricted": Decimal("4.00"),
     "Classified": Decimal("20.00"),
@@ -118,10 +154,27 @@ def to_money(value):
 
 
 def format_money(value):
-    """Formata no padrão brasileiro: Decimal("1234.5") -> "R$ 1.234,50"."""
-    texto = f"{to_money(value):,.2f}"                      # "1,234.50"
-    texto = texto.replace(",", "X").replace(".", ",").replace("X", ".")
-    return f"{CURRENCY_SYMBOL} {texto}"
+    """Valor do banco (sempre em reais) pronto para a tela, no idioma atual.
+    pt: Decimal("1234.5") -> "R$ 1.234,50"
+    en: convertido pela cotação BRL_PER_USD -> "US$ 236.49"."""
+    return format_display(display_value(value))
+
+
+def display_value(value):
+    """Valor do banco (em reais) na moeda da tela, com 2 casas (em inglês, já em dólar)."""
+    if i18n.idioma() == "en":
+        return to_money(Decimal(str(value)) / BRL_PER_USD)
+    return to_money(value)
+
+
+def format_display(amount):
+    """Formata um valor que JÁ está na moeda da tela.
+
+    Serve para contas feitas com valores convertidos, para fecharem na tela:
+    format_display(display_value(preco) * 4) -> 4 x US$ 1.45 = "US$ 5.80"
+    (convertendo o total em reais daria US$ 5.79, por causa do arredondamento)."""
+    simbolo = CURRENCY_SYMBOL_USD if i18n.idioma() == "en" else CURRENCY_SYMBOL
+    return f"{simbolo} {i18n.numero(to_money(amount))}"
 
 
 def has_wear(min_float, max_float):
@@ -145,17 +198,42 @@ def wear_range(wear):
     for nome, inicio, fim, _chance, _pt in WEARS:
         if nome == wear:
             return inicio, fim
-    raise ValueError(f"Desgaste desconhecido: {wear}")
+    raise ValueError(i18n.t("Desgaste desconhecido: {desgaste}", desgaste=wear))
 
 
 def wear_label(wear):
-    """Nome do desgaste em português (para mostrar na tela)."""
+    """Nome do desgaste para a tela: em português ("Testada em Campo") ou,
+    em inglês, o nome oficial ("Field-Tested")."""
+    if i18n.idioma() == "en":
+        return wear
     if wear == NO_WEAR:
         return NO_WEAR_LABEL
     for nome, _inicio, _fim, _chance, pt in WEARS:
         if nome == wear:
             return pt
     return wear
+
+
+def wear_label_full(wear):
+    """Em português também mostra o nome oficial: "Testada em Campo (Field-Tested)".
+    Em inglês os dois são iguais, então aparece só "Field-Tested"."""
+    rotulo = wear_label(wear)
+    return rotulo if rotulo == wear else f"{rotulo} ({wear})"
+
+
+def rarity_label(rarity_name):
+    """Nome da raridade para a tela: o oficial ("Covert"); facas e luvas viram
+    "★ Item Especial Raro" (pt) / "★ Rare Special Item" (en)."""
+    if rarity_name == SPECIAL_RARITY_NAME:
+        return SPECIAL_RARITY_LABELS[i18n.idioma()][0]
+    return rarity_name
+
+
+def rarity_short_label(rarity_name):
+    """Nome curto (botões de filtro): "Mil-Spec Grade" -> "Mil-Spec"; facas e luvas -> "★ Especiais"."""
+    if rarity_name == SPECIAL_RARITY_NAME:
+        return SPECIAL_RARITY_LABELS[i18n.idioma()][1]
+    return rarity_name.replace(" Grade", "")
 
 
 def available_wears(min_float, max_float):
@@ -191,3 +269,32 @@ def estimated_price(rarity_name, wear):
     base = RARITY_BASE_PRICE.get(rarity_name, RARITY_BASE_PRICE["Mil-Spec Grade"])
     fator = WEAR_PRICE_FACTOR.get(wear, Decimal("1.00"))
     return to_money(base * fator)
+
+
+def price_change(history, hours=24):
+    """Variação do preço para o ▲▼ do mercado.
+
+    history: lista de (data, preço) do mais antigo para o mais novo (como os
+    DAOs devolvem). Compara o ÚLTIMO preço com o ponto mais recente que tenha
+    pelo menos `hours` horas a menos. Se o histórico ainda for mais curto que
+    isso, compara com o PRIMEIRO ponto (e as horas devolvidas mostram o período real).
+
+    Devolve (variação em %, horas entre os dois pontos), ou None quando há
+    menos de 2 pontos ou o preço de referência é zero.
+    Ex.: [(sex 08h, 10.00), (sáb 08h, 11.00)] -> (Decimal("10.0"), 24)
+    """
+    if not history or len(history) < 2:
+        return None
+    ultima_data, ultimo_preco = history[-1]
+    limite = ultima_data - timedelta(hours=hours)
+    ref_data, ref_preco = history[0]
+    for data, preco in history[:-1]:
+        if data > limite:
+            break
+        ref_data, ref_preco = data, preco      # o mais recente que ainda está fora da janela
+    ref_preco = Decimal(str(ref_preco))
+    if ref_preco <= 0:
+        return None
+    variacao = (Decimal(str(ultimo_preco)) - ref_preco) / ref_preco * Decimal("100")
+    horas = int(round((ultima_data - ref_data).total_seconds() / 3600))
+    return variacao.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP), horas

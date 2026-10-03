@@ -1,5 +1,6 @@
 import mysql.connector
 
+from app.core.i18n import t
 from app.dao.base_dao import DAO
 from app.models.user import User
 
@@ -17,10 +18,10 @@ class User_DAO(DAO):
         # A mensagem do MySQL termina com: ... for key 'users.email'
         key = (error.msg or "").lower().rsplit("for key", 1)[-1]
         if "email" in key:
-            return "E-mail já cadastrado."
+            return t("E-mail já cadastrado.")
         if "username" in key:
-            return "Nome de usuário já cadastrado."
-        return "Usuário já cadastrado."
+            return t("Nome de usuário já cadastrado.")
+        return t("Usuário já cadastrado.")
 
     def save(self, user):
         connection, cursor = self.connect()

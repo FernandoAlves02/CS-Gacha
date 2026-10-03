@@ -9,6 +9,7 @@ Rodar da raiz do projeto:
 """
 import random
 import unittest
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from app.controller.inventory_controller import Inventory_Controller
@@ -57,6 +58,9 @@ class FakeRarityDAO:
     def get_probabilities(self):
         return {r.id: r.probability for r in RARIDADES.values()}
 
+    def get_all(self):
+        return list(RARIDADES.values())
+
 
 class FakeSkinCatalogDAO:
     def count_market_listings(self, search="", rarity_id=None):
@@ -65,6 +69,13 @@ class FakeSkinCatalogDAO:
     def get_market_listings(self, search="", limit=24, offset=0, rarity_id=None):
         self.ultimo = (search, limit, offset)
         return []
+
+    def get_history_for_listings(self, listings):
+        agora = datetime(2026, 10, 5, 8, 0)
+        historico = {par: [] for par in listings}
+        historico[(10, "Field-Tested")] = [(agora - timedelta(hours=24), Decimal("2.00")),
+                                           (agora, Decimal("2.50"))]
+        return historico
 
 
 class FakeInventoryDAO:
@@ -82,15 +93,18 @@ class FakeInventoryDAO:
         if self.erro:
             raise self.erro
 
-    def buy_case(self, user_id, collection_id, expected_price=None):
-        self.chamadas.append(("buy_case", collection_id, expected_price))
+    def buy_case(self, user_id, collection_id, expected_price=None, quantity=1):
+        self.chamadas.append(("buy_case", collection_id, expected_price) + ((quantity,) if quantity != 1 else ()))
         self._talvez_erro()
         return Decimal("490.00")
 
-    def buy_skin(self, user_id, skin_id, wear, float_value, expected_price=None):
-        self.chamadas.append(("buy_skin", skin_id, wear, float_value, expected_price))
+    def buy_skins(self, user_id, skin_id, wear, float_values, expected_price=None):
+        if len(float_values) == 1:
+            self.chamadas.append(("buy_skin", skin_id, wear, float_values[0], expected_price))
+        else:
+            self.chamadas.append(("buy_skins", skin_id, wear, list(float_values), expected_price))
         self._talvez_erro()
-        return 99, expected_price, Decimal("400.00")
+        return list(range(99, 99 + len(float_values))), expected_price, Decimal("400.00")
 
     def open_case(self, user_id, collection_id, skin_id, float_value):
         self.chamadas.append(("open_case", collection_id, skin_id, float_value))
@@ -164,16 +178,101 @@ class MarketControllerTests(unittest.TestCase):
         self.assertEqual(instancia.wear, "Field-Tested")
         self.assertEqual(self.user.balance, Decimal("400.00"))
 
+    def test_compra_de_varias_unidades(self):
+        c = self._controller()
+        self.assertTrue(c.buy_case(Collection(1, "Caixa Teste", "10.00"), quantity=3))
+        self.assertEqual(self.inv.chamadas[-1], ("buy_case", 1, Decimal("10.00"), 3))
+        self.assertIn("3x Caixa Teste", self.view.last[0])
+        anuncio = Market_Price(10, "Field-Tested", "12.00")
+        compradas = c.buy_skins(SKINS[0], anuncio, 4)
+        _, _, _, floats, _ = self.inv.chamadas[-1]
+        self.assertEqual(len(compradas), 4)
+        self.assertEqual(len(set(floats)), 4)                         # cada unidade com o seu float
+        self.assertTrue(all(Decimal("0.15") <= f < Decimal("0.38") for f in floats))
+
+    def test_quantidade_fora_do_limite_nem_chega_no_banco(self):
+        c = self._controller()
+        chamadas_antes = len(self.inv.chamadas)
+        anuncio = Market_Price(10, "Field-Tested", "12.00")
+        for invalida in (0, -1, 51, 2.5, "3"):
+            self.assertFalse(c.buy_case(Collection(1, "Caixa Teste", "10.00"), quantity=invalida))
+            self.assertEqual(c.buy_skins(SKINS[0], anuncio, invalida), [])
+            self.assertIn("Quantidade inválida", self.view.last[0])
+            self.assertIsNotNone(c.check_purchase(Decimal("1.00"), invalida))
+        self.assertEqual(len(self.inv.chamadas), chamadas_antes)       # o DAO nem foi chamado
+        self.assertEqual(self.user.balance, Decimal("500.00"))
+        self.assertIsNone(c.check_quantity(50))
+
+    def test_quantidade_maxima(self):
+        c = self._controller(inv=FakeInventoryDAO(itens=995), user=novo_usuario("100.00"))
+        self.assertEqual(c.max_quantity(Decimal("10.00")), 5)        # só 5 vagas no inventário
+        c = self._controller(inv=FakeInventoryDAO(itens=0), user=novo_usuario("25.00"))
+        self.assertEqual(c.max_quantity(Decimal("10.00")), 2)        # o saldo dá para 2
+        self.assertEqual(c.max_quantity(Decimal("0.01")), 50)        # limite por compra
+        self.assertEqual(c.check_purchase(Decimal("10.00"), 3), "Saldo insuficiente.")
+
     def test_conteudo_da_caixa_com_chances(self):
         tabela = self._controller().case_contents(1)
         self.assertEqual(len(tabela), 2)
         self.assertAlmostEqual(float(sum(c for _, c in tabela)), 1.0, places=12)
+
+    def test_variacao_dos_anuncios_da_pagina(self):
+        c = self._controller()
+        anuncios = [(SKINS[0], Market_Price(10, "Field-Tested", "2.50")),
+                    (SKINS[0], Market_Price(10, "Minimal Wear", "3.00"))]
+        variacoes = c.price_changes(anuncios)
+        self.assertEqual(variacoes, {(10, "Field-Tested"): (Decimal("25.0"), 24)})   # sem histórico: fica de fora
+
+    def test_variacao_com_banco_fora_do_ar_nao_derruba_a_tela(self):
+        c = self._controller()
+        c.skin_catalog_dao.get_history_for_listings = lambda pares: 1 / 0
+        with self.assertLogs("app.controller.market_controller", level="ERROR"):
+            self.assertEqual(c.price_changes([(SKINS[0], Market_Price(10, "Field-Tested", "2.50"))]), {})
+
+    def test_raridades_para_os_filtros(self):
+        self.assertEqual(self._controller().list_rarities(), [])          # sem rarity_dao: sem filtros
+        c = Market_Controller(FakeCollectionDAO(), FakeSkinCatalogDAO(), FakeInventoryDAO(), FakeView(),
+                              novo_usuario(), rarity_dao=FakeRarityDAO())
+        self.assertEqual([r.name for r in c.list_rarities()], ["Mil-Spec Grade", "Special Item"])
+        # ordem da interface: da mais comum para a mais rara (não pelo id do banco)
+        c.rarity_dao.get_all = lambda: [Rarity(5, "Special Item", "0.0026"), Rarity(6, "Consumer Grade", "0"),
+                                        Rarity(1, "Mil-Spec Grade", "0.7992")]
+        self.assertEqual([r.name for r in c.list_rarities()], ["Consumer Grade", "Mil-Spec Grade", "Special Item"])
 
     def test_paginacao(self):
         c = self._controller()
         _, paginas = c.list_skins("ak", page=2)
         self.assertEqual(paginas, 3)                     # 50 anúncios / 24 por página
         self.assertEqual(self.catalogo.ultimo, ("ak", 24, 48))
+
+
+class MarketSearchTests(unittest.TestCase):
+    """Busca do mercado: cada palavra em qualquer ordem (testada num SQLite em memória)."""
+
+    NOMES = ["AK-47 | Inheritance", "AK-47 | Redline", "M4A4 | Inheritance", "★ Karambit | Doppler (Phase 2)",
+             "AWP | Asiimov"]
+
+    def buscar(self, texto):
+        import sqlite3
+        from contextlib import closing
+        from app.dao.skin_catalog_dao import search_filters
+        # closing(): fecha o banco no fim (o Python 3.13+ avisa ResourceWarning se ficar aberto)
+        with closing(sqlite3.connect(":memory:")) as banco:
+            banco.execute("CREATE TABLE s (name TEXT)")
+            banco.executemany("INSERT INTO s VALUES (?)", [(n,) for n in self.NOMES])
+            filtros, params = search_filters(texto)
+            sql = "SELECT name FROM s s WHERE " + (" AND ".join(filtros) or "1 = 1")
+            return sorted(n for (n,) in banco.execute(sql.replace("%s", "?"), params))
+
+    def test_palavras_em_qualquer_ordem(self):
+        for texto in ("inheritance", "ak inheritance", "ak-47 inheritance", "Inheritance AK", "ak47 inheritance"):
+            esperado = ["AK-47 | Inheritance"] if "ak" in texto.lower() else ["AK-47 | Inheritance", "M4A4 | Inheritance"]
+            self.assertEqual(self.buscar(texto), esperado, texto)
+
+    def test_nome_com_barra_e_vazio(self):
+        self.assertEqual(self.buscar("AK-47 | Redline"), ["AK-47 | Redline"])
+        self.assertEqual(self.buscar("karambit phase 2"), ["★ Karambit | Doppler (Phase 2)"])
+        self.assertEqual(len(self.buscar("   ")), len(self.NOMES))
 
 
 class InventoryControllerTests(unittest.TestCase):
@@ -184,6 +283,13 @@ class InventoryControllerTests(unittest.TestCase):
         self.user = novo_usuario()
         return Inventory_Controller(self.inv, FakeCollectionDAO(), FakeRarityDAO(), self.view, self.user,
                                     random.Random(4))
+
+    def test_conteudo_da_caixa_para_a_roleta(self):
+        tabela = self._controller().case_contents(1)
+        self.assertEqual([s.id for s, _ in tabela], [10, 11])
+        self.assertAlmostEqual(float(sum(c for _, c in tabela)), 1.0, places=12)
+        self.assertEqual(self._controller().case_contents(99), [])       # caixa sem itens
+        self.assertFalse(self.view.last[1])                               # avisa o jogador
 
     def test_abrir_caixa_devolve_resultado_pronto_para_a_tela(self):
         c = self._controller()

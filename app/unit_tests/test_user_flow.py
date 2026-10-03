@@ -165,6 +165,31 @@ class UserControllerTests(unittest.TestCase):
         self.assertTrue(view.messages[-1][1])
 
 
+class UserUpdateTests(unittest.TestCase):
+    """Minha conta: editar nome, e-mail e senha."""
+
+    def setUp(self):
+        self.dao = FakeDAO()
+        for dados in (("ana", "segredo123", "ana@x.com"), ("bia", "segredo123", "bia@x.com")):
+            User_Controller(self.dao, FakeView(register_data=dados)).save()
+
+    def test_email_de_outra_conta_nao_altera_a_sessao(self):
+        sessao = User(1, "ana", None, "ana@x.com", 500)
+        self.dao.update = lambda user: (_ for _ in ()).throw(ValueError("Este e-mail já está cadastrado."))
+        view = FakeView(profile_data=("ana", "", "bia@x.com"))
+        User_Controller(self.dao, view).update(sessao)
+        self.assertEqual(sessao.email, "ana@x.com")                 # sessão intacta
+        self.assertFalse(view.messages[-1][1])
+
+    def test_senha_nova_vai_para_o_banco_com_hash_e_nao_fica_na_sessao(self):
+        gravados = []
+        self.dao.update = gravados.append
+        sessao = User(1, "ana", None, "ana@x.com", 500)
+        User_Controller(self.dao, FakeView(profile_data=("ana", "novaSenha1", "ana@x.com"))).update(sessao)
+        self.assertTrue(Password_Utils.check_password("novaSenha1", gravados[-1].password))
+        self.assertIsNone(sessao.password)
+
+
 class LoginControllerTests(unittest.TestCase):
 
     def setUp(self):

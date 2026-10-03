@@ -1,5 +1,6 @@
 import logging
 
+from app.core.i18n import t
 from app.core.password_utils import Password_Utils
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ class Login_Controller:
             login = (login or "").strip()
 
             if not login or not password:
-                self.view.show_message("Informe usuário e senha.", False)
+                self.view.show_message(t("Informe usuário e senha."), False)
                 return
 
             # O campo aceita nome de usuário OU e-mail:
@@ -30,7 +31,7 @@ class Login_Controller:
         except Exception:
             logger.exception("Falha ao autenticar")
             self.view.show_message(
-                "Não foi possível entrar. Verifique a conexão com o banco.",
+                t("Não foi possível entrar. Verifique a conexão com o banco."),
                 False
             )
             return
@@ -38,7 +39,7 @@ class Login_Controller:
         # Mesma mensagem para "usuário não existe" e "senha errada"
         # (não revela quais contas existem).
         if user is None or not Password_Utils.check_password(password, user.password):
-            self.view.show_message("Usuário ou senha inválidos.", False)
+            self.view.show_message(t("Usuário ou senha inválidos."), False)
             return
 
         # O hash só serve para conferir a senha; não fica na sessão.

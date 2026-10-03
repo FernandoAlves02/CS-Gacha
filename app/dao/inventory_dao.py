@@ -11,6 +11,7 @@ from app.core.game_rules import (
     to_money,
     wear_from_float,
 )
+from app.core.i18n import t
 from app.dao.base_dao import Base_DAO
 from app.dao.collection_dao import COLLECTION_COLUMNS, collection_from_row
 from app.dao.skin_catalog_dao import SKIN_COLUMNS, skin_from_row
@@ -143,12 +144,15 @@ class Inventory_DAO(Base_DAO):
     # TRANSAÇÕES (dinheiro + itens)
     # ==========================================================
 
-    def buy_case(self, user_id, collection_id, expected_price=None):
-        """Compra 1 caixa no mercado. Devolve o novo saldo.
+    def buy_case(self, user_id, collection_id, expected_price=None, quantity=1):
+        """Compra caixa(s) no mercado (quantity unidades, tudo ou nada). Devolve o novo saldo.
 
         expected_price: preço que o jogador viu ao confirmar. Se o importador
         mudou o preço nesse meio tempo, a compra é recusada (ele confirma de novo).
         """
+        quantity = int(quantity)
+        if quantity < 1:
+            raise ValueError(t("Quantidade inválida."))
         connection, cursor = self.connect(buffered=True)
 
         try:
@@ -165,22 +169,23 @@ class Inventory_DAO(Base_DAO):
             )
             data = cursor.fetchone()
             if data is None:
-                raise ValueError("Caixa não encontrada no mercado.")
+                raise ValueError(t("Caixa não encontrada no mercado."))
             if int(data[1]) == 0:
-                raise ValueError("Esta caixa está indisponível (sem conteúdo cadastrado).")
+                raise ValueError(t("Esta caixa está indisponível (sem conteúdo cadastrado)."))
 
             price = to_money(data[0])
             self._check_expected_price(price, expected_price)
 
-            if balance < price:
-                raise ValueError("Saldo insuficiente.")
-            self._check_space(cursor, user_id, entering=1, leaving=0)
+            total = price * quantity
+            if balance < total:
+                raise ValueError(t("Saldo insuficiente."))
+            self._check_space(cursor, user_id, entering=quantity, leaving=0)
 
-            new_balance = balance - price
+            new_balance = balance - total
             self._set_balance(cursor, user_id, new_balance)
-            cursor.execute(
+            cursor.executemany(
                 "INSERT INTO collections_instance (user_id, collection_id) VALUES (%s, %s)",
-                (user_id, collection_id)
+                [(user_id, collection_id)] * quantity
             )
 
             connection.commit()
@@ -225,7 +230,7 @@ class Inventory_DAO(Base_DAO):
             )
             data = cursor.fetchone()
             if data is None:
-                raise ValueError("Você não tem essa caixa no inventário.")
+                raise ValueError(t("Você não tem essa caixa no inventário."))
             case_instance_id = data[0]
 
             # 2. espaço: sai 1 caixa e entra 1 skin
@@ -233,7 +238,7 @@ class Inventory_DAO(Base_DAO):
 
             # 3. chave
             if balance < KEY_PRICE:
-                raise ValueError(f"Saldo insuficiente para a chave ({format_money(KEY_PRICE)}).")
+                raise ValueError(t("Saldo insuficiente para a chave ({preco}).", preco=format_money(KEY_PRICE)))
 
             # 4. a skin sorteada é mesmo dessa caixa?
             cursor.execute(
@@ -249,7 +254,7 @@ class Inventory_DAO(Base_DAO):
             )
             data = cursor.fetchone()
             if data is None:
-                raise ValueError("O item sorteado não pertence a esta caixa.")
+                raise ValueError(t("O item sorteado não pertence a esta caixa."))
             skin = skin_from_row(data)
             float_value = Decimal(str(float_value))
             self._check_float(skin, float_value)
@@ -287,7 +292,16 @@ class Inventory_DAO(Base_DAO):
             self.disconnect(cursor, connection)
 
     def buy_skin(self, user_id, skin_catalog_id, wear, float_value, expected_price=None):
-        """Compra uma skin avulsa no mercado. Devolve (id da nova skin, preço pago, novo saldo)."""
+        """Compra UMA skin avulsa no mercado. Devolve (id da nova skin, preço pago, novo saldo)."""
+        ids, price, new_balance = self.buy_skins(user_id, skin_catalog_id, wear, [float_value], expected_price)
+        return ids[0], price, new_balance
+
+    def buy_skins(self, user_id, skin_catalog_id, wear, float_values, expected_price=None):
+        """Compra várias unidades da mesma skin/desgaste (uma por float), tudo ou nada.
+        Devolve (lista de ids das novas skins, preço unitário, novo saldo)."""
+        float_values = [Decimal(str(valor)) for valor in float_values]
+        if not float_values:
+            raise ValueError(t("Quantidade inválida."))
         connection, cursor = self.connect(buffered=True)
 
         try:
@@ -306,33 +320,36 @@ class Inventory_DAO(Base_DAO):
             )
             data = cursor.fetchone()
             if data is None:
-                raise ValueError("Esse item não está à venda no mercado.")
+                raise ValueError(t("Esse item não está à venda no mercado."))
             skin = skin_from_row(data)
             price = to_money(data[14])
 
-            float_value = Decimal(str(float_value))
-            self._check_float(skin, float_value)
-            if wear_from_float(float_value, skin.has_wear) != wear:
-                raise ValueError("O float gerado não corresponde ao desgaste escolhido.")
+            for float_value in float_values:
+                self._check_float(skin, float_value)
+                if wear_from_float(float_value, skin.has_wear) != wear:
+                    raise ValueError(t("O float gerado não corresponde ao desgaste escolhido."))
 
             self._check_expected_price(price, expected_price)
-            if balance < price:
-                raise ValueError("Saldo insuficiente.")
-            self._check_space(cursor, user_id, entering=1, leaving=0)
+            total = price * len(float_values)
+            if balance < total:
+                raise ValueError(t("Saldo insuficiente."))
+            self._check_space(cursor, user_id, entering=len(float_values), leaving=0)
 
-            new_balance = balance - price
+            new_balance = balance - total
             self._set_balance(cursor, user_id, new_balance)
-            cursor.execute(
-                """
-                INSERT INTO skins_instance (skin_price, float_value, user_id, skin_catalog_id)
-                VALUES (%s, %s, %s, %s)
-                """,
-                (price, float_value, user_id, skin_catalog_id)
-            )
-            new_skin_id = cursor.lastrowid
+            new_ids = []
+            for float_value in float_values:
+                cursor.execute(
+                    """
+                    INSERT INTO skins_instance (skin_price, float_value, user_id, skin_catalog_id)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (price, float_value, user_id, skin_catalog_id)
+                )
+                new_ids.append(cursor.lastrowid)
 
             connection.commit()
-            return new_skin_id, price, new_balance
+            return new_ids, price, new_balance
 
         except Exception:
             self._rollback(connection)
@@ -352,7 +369,7 @@ class Inventory_DAO(Base_DAO):
             # confirma que o item existe e é do jogador (e trava a linha)
             instance = self._find_owned_skin(cursor, user_id, skin_instance_id, lock=True)
             if not instance.skin.market_name:
-                raise ValueError("Este item não pode ser vendido.")
+                raise ValueError(t("Este item não pode ser vendido."))
 
             price = self._market_price(cursor, instance.skin, instance.wear)
             payout = sell_payout(price)
@@ -381,13 +398,13 @@ class Inventory_DAO(Base_DAO):
         cursor.execute("SELECT balance FROM users WHERE id = %s FOR UPDATE", (user_id,))
         data = cursor.fetchone()
         if data is None:
-            raise ValueError("Usuário não encontrado.")
+            raise ValueError(t("Usuário não encontrado."))
         return to_money(data[0])
 
     def _set_balance(self, cursor, user_id, new_balance):
         if new_balance < 0:
             # Proteção extra: a regra já foi checada antes e o banco tem CHECK.
-            raise ValueError("Saldo insuficiente.")
+            raise ValueError(t("Saldo insuficiente."))
         cursor.execute("UPDATE users SET balance = %s WHERE id = %s", (to_money(new_balance), user_id))
 
     def _count_items(self, cursor, user_id):
@@ -405,7 +422,7 @@ class Inventory_DAO(Base_DAO):
         """Regra do inventário: total depois da operação não pode passar do limite."""
         total_depois = self._count_items(cursor, user_id) - leaving + entering
         if total_depois > INVENTORY_LIMIT:
-            raise ValueError("Inventário cheio!")
+            raise ValueError(t("Inventário cheio!"))
 
     def _find_owned_skin(self, cursor, user_id, skin_instance_id, lock):
         sql = f"""
@@ -419,7 +436,7 @@ class Inventory_DAO(Base_DAO):
         cursor.execute(sql, (skin_instance_id, user_id))
         data = cursor.fetchone()
         if data is None:
-            raise ValueError("Item não encontrado no seu inventário.")
+            raise ValueError(t("Item não encontrado no seu inventário."))
         return instance_from_row(data)
 
     def _market_price(self, cursor, skin, wear):
@@ -439,15 +456,15 @@ class Inventory_DAO(Base_DAO):
         """Defesa: o float tem de estar dentro do intervalo da skin."""
         if not has_wear(skin.min_float, skin.max_float):
             if float_value != 0:
-                raise ValueError("Este item não tem desgaste (float deve ser 0).")
+                raise ValueError(t("Este item não tem desgaste (float deve ser 0)."))
             return
         if not (skin.min_float <= float_value < skin.max_float):
-            raise ValueError("Float fora do intervalo permitido para esta skin.")
+            raise ValueError(t("Float fora do intervalo permitido para esta skin."))
 
     @staticmethod
     def _check_expected_price(price, expected_price):
         if expected_price is not None and to_money(expected_price) != price:
-            raise ValueError(f"O preço mudou para {format_money(price)}. Confira e tente de novo.")
+            raise ValueError(t("O preço mudou para {preco}. Confira e tente de novo.", preco=format_money(price)))
 
     @staticmethod
     def _rollback(connection):

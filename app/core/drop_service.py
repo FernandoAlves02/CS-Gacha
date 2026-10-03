@@ -22,6 +22,7 @@ import random
 from decimal import ROUND_DOWN, Decimal
 
 from app.core.game_rules import FLOAT_STEP, NO_WEAR, WEARS, has_wear, wear_from_float, wear_range
+from app.core.i18n import t
 
 
 def group_by_rarity(items):
@@ -36,14 +37,14 @@ def _check_inputs(items, probabilities):
     """Valida os dados antes de sortear. Qualquer erro aqui impede que a caixa seja consumida."""
     if not items:
         raise ValueError(
-            "Esta caixa não tem itens cadastrados. Rode o importador: python tools/sync_market.py"
+            t("Esta caixa não tem itens cadastrados. Rode o importador: python tools/sync_market.py")
         )
     grupos = group_by_rarity(items)
     for rarity_id in grupos:
         if rarity_id not in probabilities:
-            raise ValueError(f"A raridade {rarity_id} não tem probabilidade cadastrada.")
+            raise ValueError(t("A raridade {raridade} não tem probabilidade cadastrada.", raridade=rarity_id))
     if sum(Decimal(str(probabilities[r])) for r in grupos) <= 0:
-        raise ValueError("As probabilidades desta caixa somam zero.")
+        raise ValueError(t("As probabilidades desta caixa somam zero."))
     return grupos
 
 
@@ -90,7 +91,8 @@ def draw_float(min_float, max_float, rng=random):
     if not has_wear(minimo, maximo):
         return Decimal("0")
     if minimo >= maximo:
-        raise ValueError(f"Float inválido no catálogo (mínimo {minimo} >= máximo {maximo}).")
+        raise ValueError(t("Float inválido no catálogo (mínimo {minimo} >= máximo {maximo}).",
+                           minimo=minimo, maximo=maximo))
 
     # a) sorteia a faixa de desgaste com os pesos 3/24/33/24/16
     faixa = rng.choices(WEARS, weights=[w[3] for w in WEARS], k=1)[0]
@@ -112,16 +114,16 @@ def float_for_wear(min_float, max_float, wear, rng=random):
     maximo = Decimal(str(max_float))
     if wear == NO_WEAR:
         if has_wear(minimo, maximo):
-            raise ValueError("Esta skin tem desgaste; escolha um desgaste válido.")
+            raise ValueError(t("Esta skin tem desgaste; escolha um desgaste válido."))
         return Decimal("0")
     if not has_wear(minimo, maximo):
-        raise ValueError("Este item não tem desgaste.")
+        raise ValueError(t("Este item não tem desgaste."))
 
     inicio, fim = wear_range(wear)
     baixo = max(inicio, minimo)
     alto = min(fim, maximo)
     if baixo >= alto:
-        raise ValueError(f"Esta skin não existe em {wear}.")
+        raise ValueError(t("Esta skin não existe em {desgaste}.", desgaste=wear))
     valor = float(baixo) + rng.random() * (float(alto) - float(baixo))
     return _clamp(Decimal(str(valor)), baixo, alto)
 

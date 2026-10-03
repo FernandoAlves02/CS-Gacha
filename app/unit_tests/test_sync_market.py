@@ -17,9 +17,11 @@ import tools.sync_market as sync
 from tools.sync_market import (
     SteamLimite,
     _describe_error,
+    add_market_only_skins,
     build_catalog,
     fetch_steam_price,
     index_skins,
+    market_only_skins,
     only_cases,
     parse_brl,
     pick_steam_price,
@@ -76,6 +78,16 @@ SKINS = [
     {"id": "skin-bfade", "name": "★ Bayonet | Fade", "min_float": 0.0, "max_float": 0.08,
      "weapon": {"name": "Bayonet"}},
     {"id": "skin-kdop", "name": "★ Karambit | Doppler", "min_float": 0.0, "max_float": 0.08},
+    # skins que não saem de caixa (coleções de mapa): só entram com --colecoes
+    {"id": "skin-nova", "name": "Nova | Sand Dune", "min_float": 0.0, "max_float": 0.5,
+     "rarity": {"name": "Industrial Grade"}, "paint_index": "99", "weapon": {"name": "Nova"}},
+    {"id": "skin-p250", "name": "P250 | Sand Dune", "min_float": 0.0, "max_float": 0.8,
+     "rarity": {"name": "Consumer Grade"}, "paint_index": "99"},
+    {"id": "skin-howl", "name": "M4A4 | Howl", "min_float": 0.0, "max_float": 0.4,
+     "rarity": {"name": "Contraband"}, "paint_index": "309"},
+    {"id": "skin-luva", "name": "★ Driver Gloves | Garden", "min_float": 0.06, "max_float": 0.8,
+     "rarity": {"name": "Extraordinary"}, "paint_index": "10"},
+    {"id": "skin-estranha", "name": "Arma | Nova Raridade", "rarity": {"name": "Raridade Futura"}, "paint_index": "1"},
 ]
 
 
@@ -127,6 +139,36 @@ class CatalogTests(unittest.TestCase):
 
     def test_sem_ligacoes_repetidas(self):
         self.assertEqual(len(self.ligacoes), len(set(self.ligacoes)))
+
+
+class MarketOnlySkinsTests(unittest.TestCase):
+    """--colecoes: skins de coleções de mapa entram só no mercado."""
+
+    def setUp(self):
+        self.cases = only_cases(CRATES)
+        self.by_id, self.by_name = index_skins(SKINS)
+        self.caixas, self.skins, self.ligacoes, self.avisos = build_catalog(self.cases, self.by_id, self.by_name)
+
+    def test_so_entram_skins_que_nao_saem_de_caixa(self):
+        extras = market_only_skins(SKINS, self.cases)
+        self.assertEqual({s["id"] for s in extras},
+                         {"skin-p250", "skin-howl", "skin-luva", "skin-estranha"})   # skin-nova está numa caixa
+        self.assertNotIn("skin-mp7", {s["id"] for s in extras})
+
+    def test_raridades_das_colecoes(self):
+        extras = market_only_skins(SKINS, self.cases)
+        novas = add_market_only_skins(self.skins, extras, self.by_id, self.by_name, self.avisos)
+        self.assertEqual(novas, 3)
+        self.assertEqual(self.skins["skin-p250"]["rarity_name"], "Consumer Grade")
+        self.assertEqual(self.skins["skin-howl"]["rarity_name"], "Contraband")
+        self.assertEqual(self.skins["skin-luva"]["rarity_name"], "Special Item")       # luvas = ★
+        self.assertNotIn("skin-estranha", self.skins)
+        self.assertTrue(any("Raridade Futura" in a for a in self.avisos))
+
+    def test_skins_de_colecao_nao_ganham_ligacao_com_caixa(self):
+        antes = list(self.ligacoes)
+        add_market_only_skins(self.skins, market_only_skins(SKINS, self.cases), self.by_id, self.by_name, self.avisos)
+        self.assertEqual(self.ligacoes, antes)
 
 
 class SteamPriceTests(unittest.TestCase):

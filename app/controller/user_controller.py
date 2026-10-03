@@ -1,5 +1,6 @@
 import logging
 
+from app.core.i18n import t
 from app.core.password_utils import Password_Utils
 from app.models.user import User
 
@@ -32,17 +33,17 @@ class User_Controller:
 
         except ValueError as e:
             # Erros de validação e e-mail/usuário já cadastrado.
-            self.view.show_message(f"Erro: {str(e)}", False)
+            self.view.show_message(t("Erro: {mensagem}", mensagem=e), False)
 
         except Exception:
             logger.exception("Falha ao cadastrar usuário")
             self.view.show_message(
-                "Não foi possível cadastrar. Verifique a conexão com o banco.",
+                t("Não foi possível cadastrar. Verifique a conexão com o banco."),
                 False
             )
 
         else:
-            self.view.show_message("Usuário cadastrado com sucesso!")
+            self.view.show_message(t("Usuário cadastrado com sucesso!"))
             if self.when_registered:
                 self.when_registered(user)
 
@@ -59,30 +60,32 @@ class User_Controller:
             if password:
                 User.validate_password(password)
 
-            # Só altera o objeto depois que tudo foi validado.
-            user.update_data(username, email)
+            # Grava uma CÓPIA: o usuário da sessão só muda depois que o banco
+            # aceitar (ex.: e-mail já usado por outra conta não altera a sessão).
+            alterado = User(user.id, username, None, email, user.balance)
             if password:
-                user.password = Password_Utils.to_hash(password)
+                alterado.password = Password_Utils.to_hash(password)
 
-            self.dao.update(user)
+            self.dao.update(alterado)
 
         except ValueError as e:
-            self.view.show_message(f"Erro: {str(e)}", False)
+            self.view.show_message(t("Erro: {mensagem}", mensagem=e), False)
 
         except Exception:
             logger.exception("Falha ao atualizar usuário")
-            self.view.show_message("Não foi possível atualizar os dados.", False)
+            self.view.show_message(t("Não foi possível atualizar os dados."), False)
 
         else:
-            self.view.show_message("Usuário atualizado com sucesso!")
+            user.update_data(username, email)      # a senha (hash) nunca fica na sessão
+            self.view.show_message(t("Usuário atualizado com sucesso!"))
 
     def delete(self, user):
         try:
             success = self.dao.delete(user.id)
             if success:
-                self.view.show_message("Usuário excluído com sucesso!")
+                self.view.show_message(t("Usuário excluído com sucesso!"))
             else:
-                self.view.show_message("Usuário não encontrado.", False)
+                self.view.show_message(t("Usuário não encontrado."), False)
         except Exception:
             logger.exception("Falha ao excluir usuário")
-            self.view.show_message("Problemas ao excluir usuário", False)
+            self.view.show_message(t("Problemas ao excluir usuário"), False)

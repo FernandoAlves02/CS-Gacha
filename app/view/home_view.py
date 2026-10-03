@@ -1,5 +1,6 @@
 from direct.gui.DirectGui import DirectLabel
 
+from app.core.i18n import t
 from app.view.game_view_base import GameViewBase
 
 # Se o jogador entrar antes de o cenário 3D terminar de carregar (ele começa
@@ -9,12 +10,14 @@ TASK_AGUARDAR_CENARIO = "home_aguardar_cenario"
 
 class HomeView(GameViewBase):
 
+    ROTA = "home"
+
     def construir_conteudo(self):
         # Por enquanto a Home é só o cenário 3D + header, como no layout original.
         backdrop = self.view_manager.backdrop
         if backdrop and not backdrop.pronto:
             self.aviso_carregando = DirectLabel(
-                text="Carregando cenário...",
+                text=t("Carregando cenário..."),
                 text_scale=0.045,
                 text_fg=(0.85, 0.85, 0.85, 1),
                 frameColor=(0, 0, 0, 0),

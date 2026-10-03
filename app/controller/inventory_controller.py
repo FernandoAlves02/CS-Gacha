@@ -1,8 +1,9 @@
 import logging
 import random
 
-from app.core.drop_service import draw_drop
+from app.core.drop_service import draw_drop, drop_table
 from app.core.game_rules import INVENTORY_LIMIT, format_money
+from app.core.i18n import t
 from app.models.drop_result import Drop_Result
 from app.models.skin_instance import Skin_Instance
 
@@ -40,7 +41,7 @@ class Inventory_Controller:
             return cases, skins
         except Exception:
             logger.exception("Falha ao carregar inventário")
-            self.view.show_message("Não foi possível carregar o inventário.", False)
+            self.view.show_message(t("Não foi possível carregar o inventário."), False)
             return [], []
 
     def status(self):
@@ -54,6 +55,19 @@ class Inventory_Controller:
     # ----------------------------------------------------------
     # ABRIR CAIXA
     # ----------------------------------------------------------
+
+    def case_contents(self, collection_id):
+        """O que pode sair da caixa, com a chance de cada item: lista de (Skin_Catalog, chance).
+        Usado na tela de abertura (prévia do conteúdo e cartões da roleta)."""
+        try:
+            items = self.collection_dao.get_items(collection_id)
+            return drop_table(items, {item.rarity_id: item.rarity.probability for item in items})
+        except ValueError as e:
+            self.view.show_message(str(e), False)
+        except Exception:
+            logger.exception("Falha ao carregar o conteúdo da caixa")
+            self.view.show_message(t("Não foi possível carregar o conteúdo da caixa."), False)
+        return []
 
     def open_case(self, collection_id):
         """Abre 1 caixa e devolve um Drop_Result (ou None se não deu certo).
@@ -83,7 +97,7 @@ class Inventory_Controller:
 
         except Exception:
             logger.exception("Falha ao abrir caixa")
-            self.view.show_message("Não foi possível abrir a caixa. Verifique a conexão com o banco.", False)
+            self.view.show_message(t("Não foi possível abrir a caixa. Verifique a conexão com o banco."), False)
             return None
 
         self.user.balance = new_balance
@@ -102,7 +116,7 @@ class Inventory_Controller:
             self.view.show_message(str(e), False)
         except Exception:
             logger.exception("Falha ao calcular valor de venda")
-            self.view.show_message("Não foi possível calcular o valor de venda.", False)
+            self.view.show_message(t("Não foi possível calcular o valor de venda."), False)
         return None
 
     def sell_skin(self, skin_instance_id):
@@ -116,11 +130,11 @@ class Inventory_Controller:
 
         except Exception:
             logger.exception("Falha ao vender skin")
-            self.view.show_message("Não foi possível concluir a venda.", False)
+            self.view.show_message(t("Não foi possível concluir a venda."), False)
             return None
 
         self.user.balance = new_balance
         self.view.show_message(
-            f"Vendida por {format_money(payout)}! Saldo: {format_money(new_balance)}"
+            t("Vendida por {valor}! Saldo: {saldo}", valor=format_money(payout), saldo=format_money(new_balance))
         )
         return payout

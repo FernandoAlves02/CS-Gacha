@@ -41,6 +41,17 @@ CAMERA_POS = Point3(-33.60, 19.90, -1.70)
 CAMERA_HPR = Vec3(130, 0, 0)
 TASK_BALANCO = "cenario_balanco_camera"
 
+# Personagem (Extras 6): posição dos PÉS medida a partir da câmera parada, como
+# antes. Ele agora fica preso no MAPA (não na câmera): no balanço da câmera ele
+# se move junto com o cenário, em vez de ficar "colado" na tela.
+PERSONAGEM_POS = Point3(1.2, 3.5, -1.7)
+# "Respiração" por código (o modelo não tem ossos): o corpo inteiro estica um
+# pouquinho para cima e balança de leve, girando em volta dos pés.
+RESPIRACAO_SEGUNDOS = 4.2        # uma inspiração + expiração
+RESPIRACAO_ALTURA = 0.006        # 0,6% mais alto no topo da respiração
+RESPIRACAO_LARGURA = 0.003       # 0,3% mais largo
+BALANCO_GRAUS = (0.5, 0.3)       # inclinação máxima para o lado e para a frente
+
 
 class SceneBackdrop:
     """Cenário 3D (mapa + personagem) usado atrás das telas do jogo.
@@ -66,6 +77,7 @@ class SceneBackdrop:
         self._nos = []
         self._fila_gpu = deque()     # partes do cenário ainda não enviadas à placa de vídeo
         self._inicio_gpu = None
+        self.respiracao = None       # nó que faz o personagem "respirar" (Extras 6)
 
     @property
     def pronto(self):
@@ -129,8 +141,8 @@ class SceneBackdrop:
         self._aplicar_visibilidade()
 
     def iniciar_balanco(self):
-        """Home: a câmera "respira" devagar (gira menos de 2 graus para os lados).
-        O personagem está preso à câmera, então só o mapa ao fundo se move."""
+        """Home: a câmera "respira" devagar (gira menos de 2 graus para os lados)
+        e o personagem respira e balança de leve (Extras 6)."""
         if not self.app.taskMgr.hasTaskNamed(TASK_BALANCO):
             self._tempo_balanco = 0.0
             self.app.taskMgr.add(self._balancar, TASK_BALANCO)
@@ -138,11 +150,21 @@ class SceneBackdrop:
     def parar_balanco(self):
         self.app.taskMgr.remove(TASK_BALANCO)
         self.app.camera.setHpr(CAMERA_HPR)
+        if self.respiracao is not None:
+            self.respiracao.setScale(1)
+            self.respiracao.setHpr(0, 0, 0)
 
     def _balancar(self, task):
         self._tempo_balanco += min(ClockObject.getGlobalClock().getDt(), 0.1)
         t = self._tempo_balanco
         self.app.camera.setHpr(CAMERA_HPR + Vec3(1.6 * math.sin(t * 0.21), 0.5 * math.sin(t * 0.13 + 1.0), 0))
+        if self.respiracao is not None:
+            # 0 = pulmão vazio, 1 = cheio (curva suave, sem "tranco" na virada)
+            folego = 0.5 - 0.5 * math.cos(2 * math.pi * t / RESPIRACAO_SEGUNDOS)
+            largura = 1 + RESPIRACAO_LARGURA * folego
+            self.respiracao.setScale(largura, largura, 1 + RESPIRACAO_ALTURA * folego)
+            lado, frente = BALANCO_GRAUS
+            self.respiracao.setHpr(0, frente * math.sin(t * 0.9 + 0.6), lado * math.sin(t * 0.45))
         return task.cont
 
     # ----------------------------------------------------------
@@ -193,11 +215,18 @@ class SceneBackdrop:
         self._nos.append(mapa)
 
     def _ao_carregar_personagem(self, personagem):
-        personagem.reparentTo(self.app.camera)
-        personagem.setPos(1.2, 3.5, -1.7)
+        # Âncora no MAPA no lugar da câmera parada: o personagem aparece no mesmo
+        # ponto da tela de antes, mas agora faz parte do cenário (Extras 6).
+        ancora = self.app.render.attachNewNode("ancora_personagem")
+        ancora.setPos(CAMERA_POS)
+        ancora.setHpr(CAMERA_HPR)
+        # nó da respiração nos pés (é em volta dele que o corpo estica e balança)
+        self.respiracao = ancora.attachNewNode("respiracao_personagem")
+        self.respiracao.setPos(PERSONAGEM_POS)
+        personagem.reparentTo(self.respiracao)
         personagem.setHpr(0, 90, 0)
-        personagem.hide()
-        self._nos.append(personagem)
+        ancora.hide()
+        self._nos.append(ancora)
 
     def _finalizar(self):
         self._estado = "pronto"

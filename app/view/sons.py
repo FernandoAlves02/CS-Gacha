@@ -6,7 +6,8 @@
 - Efeitos com nome (tique da roleta, sucesso, erro, resultado, raro): as telas
   chamam tocar_som(app, "nome").
 - Música do menu: toca em loop desde o login.
-- Volume de 0 a 100, separado para efeitos e música (CONFIGURAÇÕES).
+- Volume de 0 a 100, separado para efeitos e música (CONFIGURAÇÕES), com
+  curva (Extras 6): ver preferencias.volume_real().
 
 Sem placa de som (ou sem os arquivos), tudo vira "não faz nada": o jogo segue normal.
 """
@@ -62,9 +63,9 @@ class Sons:
             return None
 
     def aplicar_volumes(self):
-        """Lê o volume das preferências (0 a 100) e aplica nos dois "canais"."""
-        efeitos = preferencias.obter("volume_efeitos") / 100
-        musica = preferencias.obter("volume_musica") / 100
+        """Lê o volume das preferências (0 a 100) e aplica nos dois "canais", com a curva."""
+        efeitos = preferencias.volume_real("volume_efeitos")
+        musica = preferencias.volume_real("volume_musica")
         for gerente in getattr(self.app, "sfxManagerList", None) or []:
             gerente.setVolume(efeitos)
         gerente_musica = getattr(self.app, "musicManager", None)

@@ -213,6 +213,10 @@ TEXTOS_EN = {
     "NA HOME": "ON HOME",
     "DESTACAR NA HOME": "FEATURE ON HOME",
     "TIRAR DA HOME": "REMOVE FROM HOME",
+    "FIXAR NA HOME": "PIN ON HOME",
+    "arraste a skin para girar  ·  clique fora, ENTER ou ESC para fechar":
+        "drag the skin to rotate  ·  click outside, ENTER or ESC to close",
+    "arraste para girar": "drag to rotate",
     "Saldo insuficiente. Sem dinheiro? Abra a CAIXA GRÁTIS no INVENTÁRIO.":
         "Insufficient balance. Out of money? Open the FREE CASE in the INVENTORY.",
 

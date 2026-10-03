@@ -39,6 +39,7 @@ from app.core.game_rules import (
 )
 from app.core.i18n import numero, t
 from app.view.game_view_base import GameViewBase
+from app.view.skin_3d import inspecionar
 from app.view.ui_kit import (
     BASE_TEXTO,
     CENTRO,
@@ -577,13 +578,20 @@ class MarketView(GameViewBase):
         if cor is not None:
             ui.gradiente(p, -1.5, 1.5, -0.85, -0.05, cor[:3] + (0.28,), cor[:3] + (0.0,))
             ui.retangulo(p, -1.5, 1.5, -0.85, -0.838, cor)
-        # as imagens da Steam têm 256 px: até ~1,4x maior ainda fica nítido
-        ui.imagem_do_item(p, api_id, 0, -0.03, 2.0, 1.05)
         if detalhe:
             ui.texto(p, detalhe, 1.44, 0.735, 0.03, COR_TEXTO_2, DIREITA)
         fechar = ui.botao_texto(p, "", 0, 0, 0.03, self._fechar_janela)      # clicar em qualquer lugar fecha
         fechar["frameSize"] = (-1.5, 1.5, -0.85, 0.85)
-        ui.texto(p, t("clique, ENTER ou ESC para fechar"), 0, -0.80, 0.022, COR_TEXTO_3, CENTRO)
+        # Extras 6: a SKIN em 3D, girando com o mouse como a inspeção do CS (arrastar
+        # em cima dela gira e não fecha). Caixa (sem cor de raridade) ou se não der:
+        # a imagem plana de antes.
+        if cor is None or inspecionar(self.app, p, ui.textura_item(api_id), -1.25, 1.25, -0.72, 0.62) is None:
+            # as imagens da Steam têm 256 px: até ~1,4x maior ainda fica nítido
+            ui.imagem_do_item(p, api_id, 0, -0.03, 2.0, 1.05)
+            dica = t("clique, ENTER ou ESC para fechar")
+        else:
+            dica = t("arraste a skin para girar  ·  clique fora, ENTER ou ESC para fechar")
+        ui.texto(p, dica, 0, -0.80, 0.022, COR_TEXTO_3, CENTRO)
         self.acao_enter = (self._fechar_janela, [])
 
     def _mostrar_painel_vazio(self):

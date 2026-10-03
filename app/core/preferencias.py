@@ -19,8 +19,8 @@ MOEDAS = ("auto", "BRL", "USD")      # auto = segue o idioma (português: R$; in
 PADROES = {
     "moeda": "auto",
     "tela_cheia": False,
-    "volume_efeitos": 70,            # 0 a 100 (0 = sem som)
-    "volume_musica": 40,
+    "volume_efeitos": 90,            # 0 a 100 (0 = sem som). Com a curva (Extras 6), 90 soa como os 70 de antes
+    "volume_musica": 40,             # e 40 fica bem mais baixo que antes (a música estava alta demais)
     "animacoes": True,               # Home: câmera, janelinha e pedestal se mexendo
 }
 
@@ -57,15 +57,36 @@ def obter(chave):
     return _valores[chave]
 
 
-def definir(chave, valor):
-    """Muda uma preferência e salva o arquivo. Valor inválido é ignorado (devolve False)."""
+def volume_real(chave):
+    """Volume da barra (0 a 100%) -> volume que vai para o som (0.0 a 1.0), com CURVA ao cubo.
+
+    O ouvido percebe volume de forma logarítmica: com a conta linear (Extras 5),
+    10% ainda soava alto e quase toda a diferença ficava entre 0 e 20%. Ao cubo,
+    a mudança se espalha pela barra inteira e 1% na parte baixa é um ajuste fino.
+    Ex.: 10% -> 0,001 (quase mudo); 40% -> 0,064; 70% -> 0,343; 100% -> 1.
+    """
+    return (obter(chave) / 100) ** 3
+
+
+def definir(chave, valor, salvar_agora=True):
+    """Muda uma preferência e salva o arquivo. Valor inválido é ignorado (devolve False).
+
+    salvar_agora=False: só muda na memória (a barra de volume muda o valor
+    várias vezes por segundo enquanto é arrastada; ela chama salvar() no fim).
+    """
     if chave not in PADROES or not _valido(chave, valor):
         logger.warning("Preferência inválida: %s = %r", chave, valor)
         return False
     _valores[chave] = valor
+    if salvar_agora:
+        salvar()
+    return True
+
+
+def salvar():
+    """Grava todas as preferências no arquivo (se não der, o jogo segue com elas na memória)."""
     try:
         ARQUIVO.parent.mkdir(parents=True, exist_ok=True)
         ARQUIVO.write_text(json.dumps(_valores, indent=2), encoding="utf-8")
     except OSError:
         logger.warning("Não foi possível salvar as preferências em %s", ARQUIVO)
-    return True

@@ -20,6 +20,7 @@ from app.models.collection import Collection
 from app.models.market_price import Market_Price
 from app.models.rarity import Rarity
 from app.models.skin_catalog import Skin_Catalog
+from app.models.skin_instance import Skin_Instance
 from app.models.user import User
 
 RARIDADES = {
@@ -133,6 +134,12 @@ class FakeInventoryDAO:
     def set_featured_skin(self, user_id, skin_instance_id):
         self.chamadas.append(("set_featured", skin_instance_id))
         self._talvez_erro()
+
+    na_home = (None, False)          # (Skin_Instance ou None, escolhida?) como o get_featured_skin real
+
+    def get_featured_skin(self, user_id):
+        self._talvez_erro()
+        return self.na_home
 
 
 class FakeCatalogoGratis:
@@ -371,6 +378,18 @@ class InventoryControllerTests(unittest.TestCase):
         self.assertEqual(self.view.last, ("Skin em destaque na Home!", True))
         self.assertTrue(c.set_featured(None))
         self.assertTrue(self.view.last[1])
+
+    def test_tag_na_home_segue_a_skin_do_pedestal(self):
+        """Extras 6: sem escolha, a Home mostra a mais valiosa e o inventário marca ela também."""
+        c = self._controller()
+        self.assertEqual(c.home_skin(), (None, False))                  # inventário sem skins
+        self.inv.na_home = (Skin_Instance(42, 1, 10, 0.2, Decimal("9.00"), skin=SKINS[0]), False)
+        self.assertEqual(c.home_skin(), (42, False))                    # a mais valiosa (automática)
+        self.inv.na_home = (Skin_Instance(7, 1, 11, 0.2, Decimal("1.00"), skin=SKINS[1]), True)
+        self.assertEqual(c.home_skin(), (7, True))                      # escolhida pelo jogador
+        self.inv.erro = RuntimeError("banco caiu")
+        with self.assertLogs("app.controller.inventory_controller", level="ERROR"):
+            self.assertEqual(c.home_skin(), (None, False))              # sem banco: sem tag, sem erro na tela
 
     def test_vender(self):
         c = self._controller()

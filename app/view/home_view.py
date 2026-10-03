@@ -3,7 +3,9 @@
 - janelinha de ESTATÍSTICAS flutuando devagar (como se fosse o vento);
 - PEDESTAL girando com a skin em destaque (escolhida no inventário, ou a
   mais valiosa do jogador): ver vitrine_3d.py;
-- a câmera do cenário "respira" (gira menos de 2 graus para os lados);
+- a câmera do cenário "respira" (gira menos de 2 graus para os lados) e o
+  personagem respira junto (Extras 6);
+- poeira e névoa no ar (Extras 6): ver particulas.py;
 - tecla H: modo wallpaper (esconde o menu de cima); H ou ESC voltam.
 
 Os números vêm do Home_Controller (tabela user_transactions, migração 004).
@@ -20,6 +22,8 @@ from app.core import preferencias
 from app.core.game_rules import INVENTORY_LIMIT, format_money, format_wait, rarity_label
 from app.core.i18n import numero, t
 from app.view.game_view_base import GameViewBase
+from app.view.particulas import ParticulasHome
+from app.view.scene_backdrop import CAMERA_HPR, CAMERA_POS
 from app.view.ui_kit import (
     CENTRO,
     COR_LARANJA,
@@ -76,6 +80,7 @@ class HomeView(GameViewBase):
         self.aviso = Aviso(self.ui, self.raiz, TASK_AVISO, z=-0.93)
         self.animado = preferencias.obter("animacoes")    # CONFIGURAÇÕES: animações da Home
         self.vitrine = None
+        self.particulas = None
         self.wallpaper = False
         self.lbl_gratis = None
         self.gratis_libera_em = None
@@ -95,6 +100,8 @@ class HomeView(GameViewBase):
         self.app.taskMgr.add(self._animar, TASK_ANIMAR)
         if backdrop and self.animado:
             backdrop.iniciar_balanco()
+            if self.app.win is not None:
+                self.particulas = ParticulasHome(self.app, CAMERA_POS, CAMERA_HPR)
 
     # ==================================================================
     # JANELINHA DE ESTATÍSTICAS
@@ -268,6 +275,9 @@ class HomeView(GameViewBase):
         if self.vitrine is not None:
             self.vitrine.destruir()
             self.vitrine = None
+        if self.particulas is not None:
+            self.particulas.destruir()
+            self.particulas = None
         if self.view_manager.backdrop:
             self.view_manager.backdrop.parar_balanco()
         super().destruir()

@@ -18,5 +18,7 @@ Música do menu (em loop)
   https://opengameart.org/content/main-menu-music-loop
   Licença: CC0. O autor pede que o nome dele esteja nos créditos: Alex McCulloch.
   musica_menu.ogg <- main_menu_music_mastered.mp3 (convertido para OGG Vorbis)
+    Extras 6: recortada no ponto exato do loop (sem os 0,35 s de silêncio do
+    começo e sem a batida cortada do fim) e com o volume 8 dB mais baixo.
 
 Os sons originais do Counter-Strike (Valve) NÃO são usados.

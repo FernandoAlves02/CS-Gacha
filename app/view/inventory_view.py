@@ -36,6 +36,7 @@ from app.core.paths import UI_DIR
 from app.core.i18n import data, numero, t
 from app.view.case_opening import AberturaDeCaixa
 from app.view.game_view_base import GameViewBase
+from app.view.skin_3d import inspecionar
 from app.view.ui_kit import (
     CENTRO,
     COR_LARANJA,
@@ -115,7 +116,8 @@ class InventoryView(GameViewBase):
         self.selecionado = None          # índice do item selecionado
         self.gratis_libera_em = None     # caixa grátis: quando libera (None = não aparece)
         self.lbl_gratis = None           # texto "Pronta para abrir!" / "Libera em 07:05"
-        self.destaque_id = None          # skin escolhida para o pedestal da Home
+        self.destaque_id = None          # skin que está no pedestal da Home (escolhida ou a mais valiosa)
+        self.destaque_escolhido = False  # True = escolhida pelo jogador; False = a mais valiosa (automática)
 
         self.eventos = DirectObject()
         self.eventos.accept("escape", self._tecla_esc)
@@ -156,7 +158,7 @@ class InventoryView(GameViewBase):
     def _carregar(self):
         """Busca os itens do jogador no banco e redesenha a tela."""
         caixas, skins = self.controller.load()
-        self.destaque_id = self.controller.featured_skin_id()
+        self.destaque_id, self.destaque_escolhido = self.controller.home_skin()
         # Caixa grátis: só aparece quando o saldo não paga a chave (pronta ou com contagem)
         espera = self.controller.free_case_wait()
         self.gratis_libera_em = None if espera is None else datetime.now() + espera
@@ -331,10 +333,15 @@ class InventoryView(GameViewBase):
             cotacao = self.controller.sale_quote(item.id)
             texto_venda = t("VENDER  ·  {valor}", valor=format_money(cotacao[1])) if cotacao else t("VENDER")
             na_home = item.id == self.destaque_id
+            if na_home and self.destaque_escolhido:
+                destaque = (t("TIRAR DA HOME"), [None])
+            elif na_home:
+                destaque = (t("FIXAR NA HOME"), [item.id])     # está lá por ser a mais valiosa: fixa
+            else:
+                destaque = (t("DESTACAR NA HOME"), [item.id])
             acoes = [(t("DETALHES"), self._abrir_detalhes, [item], "primario"),
                      (texto_venda, self._vender, [item], "secundario"),
-                     (t("TIRAR DA HOME") if na_home else t("DESTACAR NA HOME"), self._destacar,
-                      [None if na_home else item.id], "secundario")]
+                     (destaque[0], self._destacar, destaque[1], "secundario")]
 
         # Menu ao lado direito do cartão (ou à esquerda, se não couber)
         largura, altura = self.tamanho_cartao
@@ -370,7 +377,11 @@ class InventoryView(GameViewBase):
         ui.retangulo(p, -1.40, -0.08, -0.62, 0.66, (0.07, 0.08, 0.10, 1))
         ui.gradiente(p, -1.40, -0.08, -0.62, 0.10, cor[:3] + (0.32,), cor[:3] + (0.0,))
         ui.retangulo(p, -1.40, -0.08, -0.62, -0.606, cor)
-        ui.imagem_do_item(p, skin.api_id, -0.74, 0.04, 1.20, 0.80)
+        # Extras 6: a skin em 3D, girando com o mouse (se não der, a imagem plana de antes)
+        if inspecionar(self.app, p, ui.textura_item(skin.api_id), -1.38, -0.10, -0.53, 0.64) is None:
+            ui.imagem_do_item(p, skin.api_id, -0.74, 0.04, 1.20, 0.80)
+        else:
+            ui.texto(p, t("arraste para girar"), -0.74, -0.585, 0.021, COR_TEXTO_3, CENTRO)
 
         # lado direito: informações
         x = 0.04

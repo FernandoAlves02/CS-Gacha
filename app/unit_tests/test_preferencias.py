@@ -43,6 +43,24 @@ class PreferenciasTests(unittest.TestCase):
         self.assertEqual(preferencias.obter("volume_musica"), 0)
         self.assertEqual(preferencias.obter("moeda"), "BRL")
 
+    def test_volume_com_curva_ao_cubo(self):
+        """Extras 6: 10% fica quase mudo; a barra inteira faz diferença."""
+        for porcentagem, esperado in ((0, 0.0), (10, 0.001), (40, 0.064), (70, 0.343), (100, 1.0)):
+            preferencias.definir("volume_musica", porcentagem, salvar_agora=False)
+            self.assertAlmostEqual(preferencias.volume_real("volume_musica"), esperado)
+        preferencias.definir("volume_musica", 1, salvar_agora=False)
+        self.assertLess(preferencias.volume_real("volume_musica"), 0.00001)   # 1%: ajuste bem fino
+
+    def test_barra_arrastando_so_grava_no_fim(self):
+        """Arrastar a barra muda a memória várias vezes; o arquivo só é gravado com salvar()."""
+        for valor in (39, 38, 37):
+            self.assertTrue(preferencias.definir("volume_efeitos", valor, salvar_agora=False))
+        self.assertFalse(preferencias.ARQUIVO.exists())
+        self.assertEqual(preferencias.obter("volume_efeitos"), 37)
+        preferencias.salvar()
+        preferencias.carregar()
+        self.assertEqual(preferencias.obter("volume_efeitos"), 37)
+
     def test_valor_invalido_e_ignorado(self):
         with self.assertLogs("app.core.preferencias", level="WARNING"):
             self.assertFalse(preferencias.definir("volume_efeitos", 150))

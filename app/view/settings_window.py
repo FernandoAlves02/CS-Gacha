@@ -8,14 +8,19 @@ idioma.txt do i18n); a conta do jogador no banco não muda.
 Idioma, moeda e animações mudam textos e valores da tela inteira: nesses
 casos a tela é desenhada de novo e esta janela abre de novo por cima.
 """
+from direct.gui import DirectGuiGlobals as DGG
+from direct.gui.DirectSlider import DirectSlider
 from direct.showbase.DirectObject import DirectObject
 
 from app.core import i18n, preferencias
 from app.core.game_rules import BRL_PER_USD
 from app.core.i18n import numero, t
-from app.view.ui_kit import CENTRO, COR_LINHA, COR_TEXTO, COR_TEXTO_2, COR_TEXTO_3, ESQUERDA, Janela
+from app.view.sons import tocar_som
+from app.view.ui_kit import CENTRO, COR_LARANJA, COR_LINHA, COR_TEXTO, COR_TEXTO_2, COR_TEXTO_3, ESQUERDA, Janela
 
-PASSO_VOLUME = 10
+PASSO_VOLUME = 1                  # − e + (a barra de arrastar também anda de 1 em 1)
+ESPERA_SALVAR = 0.4               # segundos parado antes de gravar o volume no arquivo
+TASK_SALVAR_VOLUME = "config_salvar_"
 
 
 class JanelaConfiguracoes:
@@ -30,6 +35,7 @@ class JanelaConfiguracoes:
         self.janela = Janela(tela.ui, tela.ui_root, self.LARGURA, self.ALTURA, t("CONFIGURAÇÕES"),
                              ao_fechar=self._ao_fechar)
         self.area = None
+        self.volumes = {}         # chave -> (barra, parte laranja, rótulo "37%", x1, x2)
         self._desenhar()
         self.eventos = DirectObject()
         self.eventos.accept("escape", self.fechar)
@@ -66,13 +72,29 @@ class JanelaConfiguracoes:
                 x += largura + 0.03
 
         def volume(z_linha, chave):
+            """[−] ======o====== [+]  37%   (barra de arrastar; − e + mudam de 1 em 1)"""
             valor = preferencias.obter(chave)
-            ui.botao(area, "−", x_opcoes + 0.045, z_linha, 0.09, 0.075, self._mudar_volume, [chave, -PASSO_VOLUME],
-                     tipo="secundario", escala=0.04, ativo=valor > 0)
-            texto = t("Sem som") if valor == 0 else f"{valor}%"
-            ui.texto(area, texto, x_opcoes + 0.21, z_linha - 0.03 * 0.36, 0.03, COR_TEXTO, CENTRO, negrito=True)
-            ui.botao(area, "+", x_opcoes + 0.375, z_linha, 0.09, 0.075, self._mudar_volume, [chave, PASSO_VOLUME],
-                     tipo="secundario", escala=0.04, ativo=valor < 100)
+            x1, x2 = x_opcoes + 0.12, x_opcoes + 0.80                   # trilho da barra
+            ui.botao(area, "−", x_opcoes + 0.045, z_linha, 0.09, 0.075, self._passo_volume, [chave, -PASSO_VOLUME],
+                     tipo="secundario", escala=0.04)
+            ui.retangulo(area, x1, x2, z_linha - 0.005, z_linha + 0.005, COR_LINHA)
+            cheio = ui.retangulo(area, x1, x1 + (x2 - x1) * valor / 100, z_linha - 0.005, z_linha + 0.005,
+                                 COR_LARANJA)
+            barra = DirectSlider(
+                parent=area, range=(0, 100), value=valor, pageSize=5, scrollSize=PASSO_VOLUME,
+                pos=((x1 + x2) / 2, 0, z_linha),
+                # área de clique alta e invisível; o trilho que aparece é o retângulo de cima
+                frameSize=(-(x2 - x1) / 2, (x2 - x1) / 2, -0.035, 0.035),
+                frameColor=(0, 0, 0, 0), relief=DGG.FLAT,
+                thumb_relief=DGG.FLAT, thumb_frameSize=(-0.014, 0.014, -0.032, 0.032), thumb_frameColor=COR_LARANJA,
+            )
+            ui.botao(area, "+", x2 + 0.075, z_linha, 0.09, 0.075, self._passo_volume, [chave, PASSO_VOLUME],
+                     tipo="secundario", escala=0.04)
+            rotulo = ui.texto(area, "", x2 + 0.24, z_linha - 0.03 * 0.36, 0.03, COR_TEXTO, CENTRO, negrito=True)
+            self.volumes[chave] = (barra, cheio, rotulo, x1, x2)
+            barra["command"] = self._arrastar_volume
+            barra["extraArgs"] = [chave]
+            self._mostrar_volume(chave)
 
         z_conta = linha(t("CONTA"))
         ui.botao(area, t("MINHA CONTA"), x_opcoes + 0.18, z_conta, 0.36, 0.075, self._abrir_minha_conta,
@@ -129,12 +151,53 @@ class JanelaConfiguracoes:
                 self.app.aplicar_tela_cheia(ligar)
             self._desenhar()
 
-    def _mudar_volume(self, chave, passo):
-        preferencias.definir(chave, max(0, min(100, preferencias.obter(chave) + passo)))
+    # ---- volume (Extras 6: barra de arrastar, de 1 em 1%) -------------
+
+    def _arrastar_volume(self, chave):
+        """Chamado pela barra a cada movimento (várias vezes por segundo ao arrastar)."""
+        barra = self.volumes[chave][0]
+        valor = int(round(barra["value"]))
+        if valor != preferencias.obter(chave):
+            self._aplicar_volume(chave, valor)
+
+    def _passo_volume(self, chave, passo):
+        """Botões − e +: 1% para cada lado."""
+        valor = max(0, min(100, preferencias.obter(chave) + passo))
+        self.volumes[chave][0]["value"] = valor          # a bolinha vai junto
+        self._aplicar_volume(chave, valor)
+
+    def _aplicar_volume(self, chave, valor):
+        """Muda o volume NA HORA; o arquivo só é gravado quando o jogador para de mexer."""
+        preferencias.definir(chave, valor, salvar_agora=False)
         sons = getattr(self.app, "sons", None)
         if sons is not None:
             sons.aplicar_volumes()
-        self._desenhar()
+        self._mostrar_volume(chave)
+        tarefa = TASK_SALVAR_VOLUME + chave
+        self.app.taskMgr.remove(tarefa)
+        self.app.taskMgr.doMethodLater(ESPERA_SALVAR, self._salvar_volume, tarefa, extraArgs=[chave])
+
+    def _salvar_volume(self, chave):
+        preferencias.salvar()
+        if chave == "volume_efeitos":
+            tocar_som(self.app, "clique")                # para ouvir como ficou o volume novo
+
+    def _mostrar_volume(self, chave):
+        _barra, cheio, rotulo, x1, x2 = self.volumes[chave]
+        valor = preferencias.obter(chave)
+        rotulo.setText(t("Sem som") if valor == 0 else f"{valor}%")
+        x_fim = x1 + (x2 - x1) * valor / 100
+        cheio["frameSize"] = (x1, max(x_fim, x1 + 0.0001), *cheio["frameSize"][2:])
+
+    def _salvar_volumes_pendentes(self):
+        """Fechou a janela no meio da espera: grava já (sem o som de teste)."""
+        pendente = False
+        for chave in ("volume_efeitos", "volume_musica"):
+            if self.app.taskMgr.hasTaskNamed(TASK_SALVAR_VOLUME + chave):
+                self.app.taskMgr.remove(TASK_SALVAR_VOLUME + chave)
+                pendente = True
+        if pendente:
+            preferencias.salvar()
 
     def _mudar_animacoes(self, ligar):
         if ligar != preferencias.obter("animacoes"):
@@ -156,6 +219,7 @@ class JanelaConfiguracoes:
 
     def _ao_fechar(self):
         self.eventos.ignoreAll()
+        self._salvar_volumes_pendentes()
         self.janela = None
         if self.ao_fechar:
             self.ao_fechar()

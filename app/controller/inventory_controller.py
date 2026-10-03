@@ -168,13 +168,18 @@ class Inventory_Controller:
     # SKIN EM DESTAQUE NA HOME
     # ----------------------------------------------------------
 
-    def featured_skin_id(self):
-        """Id da skin escolhida para o pedestal da Home (None = nenhuma)."""
+    def home_skin(self):
+        """(id da skin que ESTÁ no pedestal da Home ou None, foi escolhida pelo jogador?).
+
+        Extras 6: sem escolha, a Home mostra a skin mais valiosa; o inventário
+        marca "NA HOME" nela também (antes só marcava a escolhida à mão).
+        """
         try:
-            return self.inventory_dao.get_featured_skin_id(self.user.id)
+            instancia, escolhida = self.inventory_dao.get_featured_skin(self.user.id)
         except Exception:
             logger.exception("Falha ao consultar a skin em destaque")
-            return None
+            return None, False
+        return (instancia.id if instancia is not None else None), escolhida
 
     def set_featured(self, skin_instance_id):
         """Coloca a skin no pedestal da Home (None tira). Devolve True/False."""

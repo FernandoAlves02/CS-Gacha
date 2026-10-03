@@ -38,7 +38,7 @@
 | 4 | Tela do Mercado (caixas e skins avulsas) | ✅ validada no seu PC e no GitHub (02/10, `570efa8`) |
 | 5 | Inventário real, abertura com roleta, venda, detalhes | ✅ validada no seu PC e no GitHub (02/10, `570efa8`) |
 | 6 | Home viva (animação), vitrine "equipar", Mirage otimizada | ✅ Mirage recortada e cenário carregando no login (correção 4, 02/10: T3.5) · ⏳ animação e vitrine (D12) |
-| Extras | Pedidos de 02 e 03/10 (seção 2.4) | 🟦 Extras 1 a 5 entregues (seção 10) |
+| Extras | Pedidos de 02 e 03/10 (seção 2.4) | ✅ Extras 1 a 5 validados · 🟦 Extras 6 entregue (seção 10) |
 | 7 | Testes de aceite, documentação, apresentação | ⏳ |
 | — | Coletor de preços contínuo para o histórico (D10) | 🟦 **código pronto**: deixar rodando (T2.6) |
 
@@ -57,13 +57,12 @@
 - **Extras 3 (português/inglês):** **97 testes** automáticos (13 novos; um deles lê o código e confere que **todo texto da tela tem tradução**, com os mesmos valores) e **35 de 35** verificações com o jogo real em inglês (login, cadastro, header, mercado, compra de 4 caixas, inventário, abertura, venda, Minha conta, volta ao português, troca de idioma 8 vezes sem sobrar nada, janela ultralarga). Todas as verificações em português continuam passando. Um revisor independente comparou o português antes e depois em 80.000 valores (dinheiro, chance, variação, float, data): **nenhuma diferença**. Os pontos que ele achou foram corrigidos.
 - **Extras 4 (Home viva e caixa grátis):** **107 testes** automáticos, **40 de 40** verificações com o jogo real (Home com estatísticas e pedestal, modo wallpaper com a tecla H de verdade, caixa grátis da contagem até a abertura, destaque na Home, inglês, nada sobrando depois de 12 trocas de tela), **27 de 27** no banco de conferência (regra dos 10 minutos, inventário cheio, recusas sem gravar nada, estatísticas, destaque de outro jogador) e o autoteste do banco real com **39 de 39**. Um revisor independente achou 1 problema de verdade (o menu da caixa grátis podia reaparecer por cima da roleta) e alguns menores; o bug e os menores que afetam o jogador foram corrigidos e ganharam teste. **O que eu não consigo ver daqui:** o pedestal por cima do mapa real com o PBR (passo 5 do tutorial).
 - **Extras 5 (CONFIGURAÇÕES, tela cheia, sons e cliques maiores):** **112 testes** automáticos e **32 de 32** verificações com o jogo real (cliques de verdade no alto do header, embaixo das abas e acima do link do login; cada opção das CONFIGURAÇÕES; F11; volumes; animações desligadas; os sons disparados em cada ação, contando os "tiques" da roleta). Todas as verificações dos Extras anteriores continuam passando. Um revisor independente conferiu áudio e tela cheia no código-fonte do Panda3D 1.10; os 2 problemas que ele achou (a busca do mercado continuava recebendo teclas com as CONFIGURAÇÕES abertas; F11 não atualizava o botão da janela aberta) foram corrigidos e ganharam teste. **O que eu não consigo ouvir nem ver daqui:** o som de verdade e a tela cheia no seu Windows (passos 3 e 5 do tutorial).
+- **Extras 6 (skin 3D, pedestal da Mirage, volume fino, loop da música, personagem e poeira):** **115 testes** automáticos e **55 de 55** verificações com o jogo real: arrastar a barra de volume com o mouse de verdade, gravação só quando para de mexer, tag NA HOME seguindo a skin do pedestal, a peça 3D montada a partir do PNG, a inspeção girando com o mouse no Mercado e no inventário (e sumindo junto com a janela), o personagem preso no mapa com a câmera balançando, a poeira acompanhando a câmera e nada sobrando depois de várias trocas de tela. O arquivo da música foi conferido amostra por amostra (a emenda do loop fica contínua). Todas as verificações dos Extras anteriores continuam passando. Um revisor independente achou 5 pontos (o principal: o pedestal mudava o filtro de 4 texturas que o mapa também usa); todos foram corrigidos e ganharam teste. **O que eu não consigo ouvir nem ver daqui:** o som, o mapa com o PBR e o personagem de verdade (passos 3 a 5 do tutorial).
 
 ### 1.1 Próximos passos (na ordem)
 
-1. **Extras 1** (seção 10), se ainda não fez: migração 003, importação e coletor.
-2. **Extras 2**, **Extras 3** e **Extras 4** (seção 10): testes, checklist e commit de cada um. *Cada ZIP já contém os anteriores: extrair só o último vale pelos outros, mas os passos de banco (migrações 003 e 004) e os checklists de cada um continuam valendo.*
-3. Deixar o **coletor de preços** rodando (**T2.6**) no fim de semana.
-4. **Extras 5** (seção 10): testes, checklist e commit. *Ele também traz o Extras 4 (mas a migração 004 continua necessária).*
+1. **Extras 6** (seção 10): testes, checklist e commit. *Sem migração e sem biblioteca nova.*
+2. Deixar o **coletor de preços** rodando (**T2.6**) no fim de semana.
 
 > **O que eu NÃO consegui testar aqui:** a sua **placa de vídeo** (os prints daqui não têm o cenário 3D nem o PBR, e o renderizador por software deixa as imagens um pouco serrilhadas), o **MariaDB do XAMPP** e as **APIs reais**. Por isso cada fase tem o checklist visual no seu PC. Se algo falhar, copie a mensagem inteira e me mande.
 
@@ -108,21 +107,29 @@ Cada regra de jogo é **uma constante** em `app/core/game_rules.py`. Para mudar,
 
 | # | Pedido | Decisão | Pacote |
 |---|---|---|---|
-| 0 | *(da documentação)* Ver e editar os dados da conta | Clicar no nome no header abre "Minha conta" | 🟦 **Extras 2** (E2) |
-| 1 | Comprar várias caixas/skins de uma vez | Quantidade na janela de compra (1 a 50), numa transação só | 🟦 **Extras 2** (E2) |
+| 0 | *(da documentação)* Ver e editar os dados da conta | Clicar no nome no header abre "Minha conta" | ✅ **Extras 2** (E2) |
+| 1 | Comprar várias caixas/skins de uma vez | Quantidade na janela de compra (1 a 50), numa transação só | ✅ **Extras 2** (E2) |
 | 2 | Todas as caixas e skins | **As 42 caixas + as skins das coleções de mapa** (estas só no mercado, porque não saem de caixa). 3 raridades novas (Consumer, Industrial, Contraband) pela migração 003 | ✅ **Extras 1** (E1) |
-| 3 | Home viva | Janela flutuante com estatísticas (caixas abertas, valores movimentados...), skin em destaque num pedestal girando, câmera com leve movimento, tecla para esconder a interface (wallpaper) | 🟦 **Extras 4** (E4) |
-| 4 | Skin maior no mercado | Imagem maior no painel e clique para ampliar | 🟦 **Extras 2** (E2) |
-| 5 | Ctrl+A nos campos de texto | Ctrl+A marca tudo; a próxima tecla substitui e Backspace/Delete apagam | 🟦 **Extras 2** (E2) |
-| 6 | Busca melhor | Palavras em qualquer ordem ("ak inheritance", "ak-47 inheritance" e "ak47" acham a AK-47 \| Inheritance) | 🟦 **Extras 2** (E2) |
-| 7 | Caixa gratuita | Skins baratas + 1 rara (**5%**), sem chave. Aparece quando o saldo não paga a chave (< R$ 13,50), no máximo 1 vez a cada 10 min | 🟦 **Extras 4** (E4) |
-| 8 | Português e inglês | Troca de idioma no login e no header. Em inglês os valores aparecem em **US$**, convertidos por uma cotação definida em `game_rules.py` (o banco continua em R$) | 🟦 **Extras 3** (E3) |
+| 3 | Home viva | Janela flutuante com estatísticas (caixas abertas, valores movimentados...), skin em destaque num pedestal girando, câmera com leve movimento, tecla para esconder a interface (wallpaper) | ✅ **Extras 4** (E4) |
+| 4 | Skin maior no mercado | Imagem maior no painel e clique para ampliar | ✅ **Extras 2** (E2) |
+| 5 | Ctrl+A nos campos de texto | Ctrl+A marca tudo; a próxima tecla substitui e Backspace/Delete apagam | ✅ **Extras 2** (E2) |
+| 6 | Busca melhor | Palavras em qualquer ordem ("ak inheritance", "ak-47 inheritance" e "ak47" acham a AK-47 \| Inheritance) | ✅ **Extras 2** (E2) |
+| 7 | Caixa gratuita | Skins baratas + 1 rara (**5%**), sem chave. Aparece quando o saldo não paga a chave (< R$ 13,50), no máximo 1 vez a cada 10 min | ✅ **Extras 4** (E4) |
+| 8 | Português e inglês | Troca de idioma no login e no header. Em inglês os valores aparecem em **US$**, convertidos por uma cotação definida em `game_rules.py` (o banco continua em R$) | ✅ **Extras 3** (E3) |
 | 9 | Banco online | **Depois da apresentação** (decisão sua). Fazer do jeito seguro exige um servidor (API) entre o jogo e o banco | — |
 | 10 | Instalador .exe | **Depois da apresentação** (decisão sua). Viável com o `build_apps` do Panda3D | — |
-| 11 | *(03/10)* Cliques mais fáceis | A área clicável do menu do header vai da altura toda do header e um pouco para os lados; o mesmo nas abas, setas de página e links | 🟦 **Extras 5** (E5) |
-| 12 | *(03/10)* Configurações | **CONFIGURAÇÕES** no header, no lugar do PT \| EN (o login continua com PT \| EN). Dentro: Minha conta, idioma, **moeda** (Automática, que segue o idioma; R$; US$), sons e animações da Home. Fica salvo no PC, como o idioma | 🟦 **Extras 5** (E5) |
-| 13 | *(03/10)* Sons e música | Sons **CC0** (domínio público): [Interface Sounds, da Kenney](https://opengameart.org/content/interface-sounds) e [Main Menu Music (Loop)](https://opengameart.org/content/main-menu-music-loop). Liga/desliga e volume nas Configurações. Os sons da Valve ficaram de fora: a [política da Valve](https://developer.valvesoftware.com/wiki/Mod_Content_Usage) permite em fangame não comercial, mas num repositório público é zona cinzenta | 🟦 **Extras 5** (E5) |
-| 14 | *(03/10)* Tela cheia | JANELA / TELA CHEIA nas Configurações e atalho **F11**; a escolha fica salva no PC | 🟦 **Extras 5** (E5) |
+| 11 | *(03/10)* Cliques mais fáceis | A área clicável do menu do header vai da altura toda do header e um pouco para os lados; o mesmo nas abas, setas de página e links | ✅ **Extras 5** (E5) |
+| 12 | *(03/10)* Configurações | **CONFIGURAÇÕES** no header, no lugar do PT \| EN (o login continua com PT \| EN). Dentro: Minha conta, idioma, **moeda** (Automática, que segue o idioma; R$; US$), sons e animações da Home. Fica salvo no PC, como o idioma | ✅ **Extras 5** (E5) |
+| 13 | *(03/10)* Sons e música | Sons **CC0** (domínio público): [Interface Sounds, da Kenney](https://opengameart.org/content/interface-sounds) e [Main Menu Music (Loop)](https://opengameart.org/content/main-menu-music-loop). Liga/desliga e volume nas Configurações. Os sons da Valve ficaram de fora: a [política da Valve](https://developer.valvesoftware.com/wiki/Mod_Content_Usage) permite em fangame não comercial, mas num repositório público é zona cinzenta | ✅ **Extras 5** (E5) |
+| 14 | *(03/10)* Tela cheia | JANELA / TELA CHEIA nas Configurações e atalho **F11**; a escolha fica salva no PC | ✅ **Extras 5** (E5) |
+| 15 | *(03/10, 10h)* Skin 3D em vez do PNG girando | O PNG **não dá** para "vestir" o modelo 3D da arma (é uma foto da arma pronta, não a textura desembrulhada dela, e só temos o modelo da AK e da AWP). Feito: a própria imagem vira uma **peça sólida** (frente, verso e laterais) | 🟦 **Extras 6** (E6) |
+| 16 | *(03/10, 10h)* Inspeção 3D como no CS | A skin 3D girando com o mouse na imagem ampliada do Mercado e no DETALHES do inventário (caixas continuam com a imagem plana) | 🟦 **Extras 6** (E6) |
+| 17 | *(03/10, 10h)* Volume mais fino | Barra de arrastar de 1 em 1% com **curva** (o volume real é a porcentagem ao cubo) e − / + de 1%. Frações não fazem falta: com a curva, 1% na parte baixa já é um ajuste fino | 🟦 **Extras 6** (E6) |
+| 18 | *(03/10, 10h)* Tag NA HOME automática | A tag segue a skin que **está** no pedestal (a escolhida ou, sem escolha, a mais valiosa); na automática o menu oferece **FIXAR NA HOME** | 🟦 **Extras 6** (E6) |
+| 19 | *(03/10, 10h)* Música com corte no loop | O arquivo tinha 0,35 s de silêncio no começo e o começo de uma batida cortada no fim: recortado no ponto exato (46 compassos) e 8 dB mais baixo | 🟦 **Extras 6** (E6) |
+| 20 | *(03/10, 10h)* Pedestal mais bonito | Texturas da **própria Mirage** que já estão no projeto: degrau de pedra, corpo e tampo de mármore e a faixa decorada das paredes | 🟦 **Extras 6** (E6) |
+| 21 | *(03/10, 10h)* Personagem preso na câmera + animação | Agora fica preso no **mapa** (mesmo lugar de antes). O modelo exportado é a versão "spawnpoint", **sem ossos** (conferido: 0); a animação é uma **respiração e balanço leves por código**. Ossos de verdade: depois da apresentação | 🟦 **Extras 6** (E6) |
+| 22 | *(03/10, 10h)* Partículas na Home | Poeira flutuando e névoa leve, por código, seguindo ANIMAÇÕES DA HOME | 🟦 **Extras 6** (E6) |
 
 Ordem: 2 primeiro (para o coletor juntar histórico das caixas novas no fim de semana), depois 6, 5, 4, 1 e 0, depois 8 (antes dos itens 3 e 7, para eles já nascerem traduzidos), depois 3 e 7.
 
@@ -997,6 +1004,71 @@ ZIP `cs-gacha-extras-5.zip`, feito a partir do **estado atual do GitHub** (`cab8
 
 **Se der erro:** mande o print e o terminal inteiro.
 
+### Extras 6 — skin 3D, inspeção, pedestal da Mirage, volume fino, loop da música, personagem e poeira (itens 15 a 22) · 20 min
+
+ZIP `cs-gacha-extras-6.zip`, feito a partir do **estado atual do GitHub** (`75f7606`, que já é o Extras 5 validado). **Sem migração** e **nenhuma biblioteca nova** (tudo com o próprio Panda3D).
+
+| Arquivo | Situação | O que é |
+|---|---|---|
+| `app/view/skin_3d.py` | NOVO | Transforma o PNG da skin numa **peça sólida** (frente e verso com a imagem + paredes nas bordas, achadas pelo contorno da transparência) e a **inspeção** girando com o mouse |
+| `app/view/particulas.py` | NOVO | **Poeira e névoa** da Home (imagens geradas por código) |
+| `app/view/vitrine_3d.py` | ALTERADO | Pedestal com as **texturas da Mirage** e a skin 3D em cima (imagem sem transparência: o cartão plano de antes) |
+| `app/view/scene_backdrop.py` | ALTERADO | Personagem preso no **mapa** (não mais na câmera) e a **respiração** dele |
+| `app/view/home_view.py` | ALTERADO | Liga e desliga a poeira junto com a Home |
+| `app/view/market_view.py`, `inventory_view.py` | ALTERADOS | Inspeção 3D na imagem ampliada e no DETALHES; tag **NA HOME** na skin automática e **FIXAR NA HOME** |
+| `app/controller/inventory_controller.py` | ALTERADO | `home_skin()`: qual skin está no pedestal e se foi escolhida |
+| `app/view/settings_window.py`, `app/view/sons.py`, `app/core/preferencias.py` | ALTERADOS | Barra de volume de 1 em 1%, curva do volume e gravação só quando você para de mexer |
+| `app/assets/sounds/musica_menu.ogg` | ALTERADO | Música recortada no ponto do loop e mais baixa |
+| `app/core/i18n_en.py`, testes | ALTERADOS | Textos novos em inglês; + 3 testes (115 no total) |
+
+**Passos**
+1. `git pull` (fica igual ao GitHub, `75f7606`) e extraia o ZIP por cima do projeto.
+2. Testes:
+   ```bat
+   python -m unittest app.unit_tests.test_preferencias app.unit_tests.test_i18n app.unit_tests.test_user_flow app.unit_tests.test_gacha_rules app.unit_tests.test_gacha_controllers app.unit_tests.test_sync_market
+   ```
+   - [ ] `Ran 115 tests` e `OK`.
+3. `python main.py` (**com som**):
+   - [ ] A música está **mais baixa** que antes.
+   - [ ] Espere a virada do loop (1 min 49 s): **sem silêncio e sem batida cortada**.
+4. **CONFIGURAÇÕES**:
+   - [ ] EFEITOS SONOROS e MÚSICA têm uma **barra**: arraste a bolinha (o número muda de 1 em 1 e o volume muda na hora). − e + andam 1%.
+   - [ ] Ao soltar a barra dos efeitos, toca um "clique" de teste no volume novo.
+   - *A escala mudou (agora tem curva): os números que você salvou no Extras 5 soam mais baixos. Ajuste de novo; os padrões novos são 90% (efeitos) e 40% (música).*
+5. **HOME** (me mande um **print**: aqui eu não vejo o mapa nem o personagem):
+   - [ ] Pedestal de **pedra e mármore** com a faixa decorada da Mirage.
+   - [ ] A skin gira como uma **peça sólida**: de lado aparece a espessura, ela não vira um risco.
+   - [ ] **Personagem**: com o balanço da câmera ele se move **junto com o mapa** (não fica grudado na tela) e respira de leve.
+   - [ ] **Poeira** flutuando na frente da câmera e uma névoa bem leve.
+   - [ ] CONFIGURAÇÕES → ANIMAÇÕES DA HOME → **DESLIGADAS**: sem poeira, personagem e skin parados. LIGADAS volta.
+6. **INVENTÁRIO** (sem skin escolhida para a Home):
+   - [ ] A sua skin mais valiosa mostra **NA HOME**. Abra uma caixa: se sair uma mais valiosa, a tag vai para ela.
+   - [ ] Menu dela: **FIXAR NA HOME** (aí ela fica mesmo que saia uma mais valiosa). Fixada: **TIRAR DA HOME**. Nas outras: **DESTACAR NA HOME**.
+7. **Inspeção 3D**:
+   - [ ] MERCADO → aba SKINS → uma skin → **clique para ampliar**: a skin aparece em 3D, meio de lado.
+   - [ ] **Arraste** em cima dela: gira para os lados e um pouco para cima/baixo. Solte com velocidade: continua girando e para. Parada uns segundos, volta a girar devagar.
+   - [ ] Clique fora da skin (na janela), ENTER ou ESC: fecha. Caixas continuam com a imagem plana.
+   - [ ] INVENTÁRIO → skin → **DETALHES**: a mesma inspeção no quadro da esquerda.
+8. Commit:
+   ```bat
+   git add -A
+   git commit -m "Extras 6: skin 3D, inspecao, pedestal da Mirage, volume fino, loop da musica, personagem e poeira"
+   git push
+   ```
+
+**Como explicar na apresentação**
+- **Skin 3D sem modelo 3D:** o programa lê a transparência do PNG, acha o **contorno** da arma (algoritmo *marching squares*) e levanta uma "parede" em cada pedaço dele, ligando a imagem da frente à de trás. Funciona para as 1.800 skins sem arquivo novo.
+- **Camadas da tela:** o mapa (camada 0), a poeira (3), o pedestal (5), a interface (10) e a inspeção (20) são cenas separadas, cada uma na sua **DisplayRegion**. Uma não mexe na luz nem na câmera da outra.
+- **Volume com curva:** o ouvido percebe volume de forma logarítmica; elevar a porcentagem ao cubo espalha a mudança pela barra inteira.
+- **Loop da música:** medimos onde as batidas caem e cortamos o arquivo exatamente em 46 compassos.
+
+**Limites conhecidos**
+- A skin 3D é a **imagem com espessura**, não o modelo da arma: o verso é a mesma imagem espelhada.
+- O personagem não tem ossos: a respiração mexe o corpo inteiro, de leve.
+- A poeira fica entre a câmera e o personagem e não é escondida pelas paredes do mapa.
+
+**Se der erro:** mande o print e o terminal inteiro.
+
 ### Plano das Fases 4 e 5 (o que foi pedido e onde está)
 
 | Tarefa | Onde está | Situação |
@@ -1036,8 +1108,8 @@ ZIP `cs-gacha-extras-5.zip`, feito a partir do **estado atual do GitHub** (`cab8
 | Dia | Eu (código) | Você (integrar e validar) |
 |---|---|---|
 | **Sex 02/10** | Correções 3, 4 e 5 ✅ · Fases 4 e 5 ✅ · **Extras 1** (catálogo completo) ✅ · **Extras 2** (busca, Ctrl+A, skin maior, compra múltipla, Minha conta) ✅ · **Extras 3** (português/inglês) ✅ | Fases 4 e 5 validadas ✅ · **Extras 1** (para o coletor pegar as caixas novas) |
-| **Sáb 03/10** | **Extras 4** (Home viva, caixa grátis) ✅ · **Extras 5** (Configurações, tela cheia, sons, cliques) ✅ | Integrar Extras 2 a 5 |
-| **Dom 04/10** | Ajustes do que você encontrar nos Extras 2 a 5 | Integrar Extras 5 |
+| **Sáb 03/10** | **Extras 4** (Home viva, caixa grátis) ✅ · **Extras 5** (Configurações, tela cheia, sons, cliques) ✅ · **Extras 6** (skin 3D, inspeção, pedestal, volume, loop, personagem, poeira) ✅ | Extras 2 a 5 validados ✅ · integrar Extras 6 |
+| **Dom 04/10** | Ajustes do que você encontrar no Extras 6 | Validar o Extras 6 |
 | **Seg 05/10** | Folga para correções | — |
 | **Ter–Qua 06–07/10** | Ajustes finos e correções; slides com você | Roteiro de aceite, slides, vídeo |
 | **Qui 08/10** | **Congelar o código** | Dump do banco com o histórico → PC do professor (12.2) · ensaiar |
@@ -1092,6 +1164,7 @@ Depois leve o banco **pronto** do seu PC, que já tem os preços reais **e o his
 | Bug de última hora | Congelar na quinta; `git tag` em cada marco permite voltar (`git checkout marco-3-backend`). |
 | Tela cheia no projetor | A tela cheia abre no monitor **principal** do PC. Com o projetor em "Estender", o jogo vai para a tela do notebook: use **"Duplicar"** (Windows + P) ou deixe o projetor como tela principal. Se algo der errado, **F11** volta para a janela. |
 | Som na apresentação | Teste o volume da sala antes; nas CONFIGURAÇÕES dá para baixar ou zerar a música sem tirar os efeitos. |
+| PC do professor fraco para a Home | Poeira, respiração e balanço seguem **ANIMAÇÕES DA HOME**: desligue nas CONFIGURAÇÕES e a Home fica parada (e mais leve). |
 
 ---
 
@@ -1133,6 +1206,9 @@ Depois leve o banco **pronto** do seu PC, que já tem os preços reais **e o his
 | Sem som nenhum | Volume zerado nas CONFIGURAÇÕES, ou o Windows mandando o som para outra saída | Confira EFEITOS SONOROS e MÚSICA nas CONFIGURAÇÕES e a saída de áudio do Windows. Arquivos faltando aparecem no terminal como `Som não encontrado` |
 | A tela cheia não fica (volta para a janela) | O Windows não aceitou a resolução | O jogo volta sozinho para a janela e avisa no terminal. Use a janela (ou maximize) |
 | As configurações voltam ao padrão | O arquivo `config.json` (pasta `.cs_gacha` do seu usuário) foi apagado ou ficou ilegível | Escolha de novo; o jogo cria o arquivo outra vez |
+| Depois do Extras 6 o som ficou baixo | A barra agora tem curva: o mesmo número soa mais baixo que no Extras 5 | Suba a barra (os padrões novos são 90% nos efeitos e 40% na música) |
+| A skin aparece plana (um cartão) no pedestal ou na inspeção | Imagem da skin sem transparência, ou arquivo da imagem faltando | O jogo segue normal; rode o importador para baixar a imagem de novo |
+| Home sem poeira e com o personagem parado | ANIMAÇÕES DA HOME desligadas | CONFIGURAÇÕES → ANIMAÇÕES DA HOME → LIGADAS |
 
 ---
 

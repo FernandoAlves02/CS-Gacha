@@ -252,6 +252,68 @@ class PricePlanTests(unittest.TestCase):
         self.assertEqual(plano[-3][2], "Not Painted")
 
 
+class _BancoFalso:
+    """Banco "de mentira" para o update_prices_from_steam (só anota os comandos)."""
+
+    def __init__(self):
+        self.comandos, self.commits = [], 0
+
+    def connect(self):
+        banco = self
+
+        class Cursor:
+            def execute(self, sql, params=None):
+                banco.comandos.append(sql)
+
+            def close(self):
+                pass
+
+        class Conexao:
+            def cursor(self, buffered=False):
+                return Cursor()
+
+            def commit(self):
+                banco.commits += 1
+
+            def rollback(self):
+                pass
+
+        return Conexao()
+
+    def disconnect(self, cursor, connection):
+        pass
+
+
+class SteamLimitTests(unittest.TestCase):
+    """Extras 7: na primeira recusa da Steam (429) a passada para, sem insistir."""
+
+    def test_para_na_primeira_recusa_e_guarda_o_que_ja_veio(self):
+        consultas, esperas = [], []
+
+        def steam(nome):
+            consultas.append(nome)
+            if len(consultas) == 3:
+                raise SteamLimite()
+            return {"success": True, "median_price": "R$ 10,00"}
+
+        tarefas = [("caixa", i, None, f"Caixa {i}") for i in range(1, 7)]
+        banco = _BancoFalso()
+        with mock.patch("builtins.print"):
+            total = sync.update_prices_from_steam(banco, tarefas, fetch=steam, sleep=esperas.append)
+        self.assertEqual(len(consultas), 3)                       # não tentou de novo nem seguiu adiante
+        self.assertEqual((total["reais"], total["motivo"]), (2, "limite"))
+        self.assertEqual(esperas, [sync.STEAM_INTERVALO] * 2)     # só o intervalo normal entre consultas
+        self.assertGreaterEqual(banco.commits, 1)                 # os 2 preços que vieram ficaram salvos
+
+    def test_intervalo_configuravel(self):
+        esperas = []
+        tarefas = [("caixa", i, None, f"Caixa {i}") for i in range(1, 4)]
+        with mock.patch("builtins.print"):
+            sync.update_prices_from_steam(_BancoFalso(), tarefas, fetch=lambda nome: {"success": False},
+                                          sleep=esperas.append, intervalo=30)
+        self.assertEqual(esperas, [30, 30])
+
+
 class ContinuousModeTests(unittest.TestCase):
 
     def test_espera_entre_passadas(self):
@@ -260,10 +322,23 @@ class ContinuousModeTests(unittest.TestCase):
         self.assertEqual(sync.wait_before_next_pass({"motivo": "rede"}), sync.PAUSA_APOS_REDE)
         self.assertIsNone(sync.wait_before_next_pass({"motivo": "ctrlc"}))
 
+    def test_espera_dobra_a_cada_recusa_seguida(self):
+        horas = [sync.wait_before_next_pass({"motivo": "limite"}, n) / 3600 for n in range(1, 6)]
+        self.assertEqual(horas, [1, 2, 4, 6, 6])                  # 1 h, 2 h, 4 h e no máximo 6 h
+
+    def test_passada_tem_todas_as_caixas_e_completa_com_skins(self):
+        tarefas = [("skin", 10, "Factory New", "A"), ("caixa", 1, None, "C1"), ("skin", 11, "Minimal Wear", "B"),
+                   ("caixa", 2, None, "C2"), ("skin", 12, "Field-Tested", "C")]
+        self.assertEqual([t[3] for t in sync.tasks_for_pass(tarefas, 4)], ["C1", "C2", "A", "B"])
+        self.assertEqual([t[3] for t in sync.tasks_for_pass(tarefas, 1)], ["C1", "C2"])   # caixas sempre entram
+
     def test_repete_ate_ctrl_c_e_espera_mais_quando_a_steam_limita(self):
         resultados = [
             {"reais": 10, "sem_anuncio": 0, "falhas": 0, "parada": None, "motivo": None},
             {"reais": 3, "sem_anuncio": 0, "falhas": 0, "parada": "limite", "motivo": "limite"},
+            {"reais": 0, "sem_anuncio": 0, "falhas": 0, "parada": "limite", "motivo": "limite"},
+            {"reais": 4, "sem_anuncio": 0, "falhas": 0, "parada": None, "motivo": None},
+            {"reais": 0, "sem_anuncio": 0, "falhas": 0, "parada": "limite", "motivo": "limite"},
             {"reais": 5, "sem_anuncio": 0, "falhas": 0, "parada": "ctrl+c", "motivo": "ctrlc"},
         ]
         esperas = []
@@ -271,8 +346,10 @@ class ContinuousModeTests(unittest.TestCase):
                 mock.patch.object(sync, "update_prices_from_steam", side_effect=resultados), \
                 mock.patch("builtins.print"):
             passadas = sync.run_continuous(database=None, sleep=esperas.append)
-        self.assertEqual(passadas, 3)
-        self.assertEqual(esperas, [sync.PAUSA_ENTRE_PASSADAS, sync.PAUSA_APOS_LIMITE])
+        self.assertEqual(passadas, 6)
+        # recusa seguida dobra a espera; uma passada boa zera a contagem
+        self.assertEqual(esperas, [sync.PAUSA_ENTRE_PASSADAS, sync.PAUSA_APOS_LIMITE, 2 * sync.PAUSA_APOS_LIMITE,
+                                   sync.PAUSA_ENTRE_PASSADAS, sync.PAUSA_APOS_LIMITE])
 
 
 class ErrorMessageTests(unittest.TestCase):

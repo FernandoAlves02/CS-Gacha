@@ -2,7 +2,9 @@
 "O usuário deve conseguir visualizar e editar seus dados."
 
 Abre ao clicar no nome do jogador no header (em qualquer tela do jogo).
-Mostra nome, e-mail e saldo; permite trocar nome, e-mail e senha.
+Mostra nome, e-mail e saldo; permite trocar nome, e-mail e senha e EXCLUIR A
+CONTA (com confirmação). Com o cadastro (tela de login), fica o CRUD completo
+do usuário, como no projeto feito em aula: Create, Read, Update e Delete.
 Toda regra (validação, e-mail repetido, hash da senha) fica no User_Controller;
 esta janela só cumpre o contrato de "view" dele:
     read_profile_data() -> (nome, senha nova ou "", e-mail)
@@ -13,7 +15,7 @@ from direct.showbase.DirectObject import DirectObject
 from app.controller.user_controller import User_Controller
 from app.core.game_rules import format_money
 from app.core.i18n import t
-from app.view.ui_kit import COR_TEXTO, COR_TEXTO_2, COR_TEXTO_3, COR_VERDE, COR_VERMELHO, ESQUERDA, Janela
+from app.view.ui_kit import CENTRO, COR_TEXTO, COR_TEXTO_2, COR_TEXTO_3, COR_VERDE, COR_VERMELHO, ESQUERDA, Janela
 
 
 class JanelaMinhaConta:
@@ -63,9 +65,13 @@ class JanelaMinhaConta:
         ui.botao(p, t("FECHAR"), self.LARGURA / 2 - 0.30, -0.52, 0.40, 0.09, self.fechar, tipo="secundario",
                  escala=0.03)
         ui.botao(p, t("SALVAR"), self.LARGURA / 2 - 0.74, -0.52, 0.40, 0.09, self.salvar, escala=0.032)
+        excluir = ui.botao(p, t("EXCLUIR CONTA"), -self.LARGURA / 2 + 0.28, -0.52, 0.40, 0.09,
+                           self._confirmar_exclusao, tipo="secundario", escala=0.028)
+        excluir["text_fg"] = COR_VERMELHO
+        self.confirmacao = None             # janelinha "Excluir a conta?" (quando aberta)
 
         self.eventos = DirectObject()
-        self.eventos.accept("escape", self.fechar)
+        self.eventos.accept("escape", self._tecla_esc)
         self.campo_nome["focus"] = 1
 
     # ------------------------------------------------------------------
@@ -89,7 +95,48 @@ class JanelaMinhaConta:
         self.tela.atualizar_saldo()                 # o header mostra o nome novo
 
     def _salvar_enter(self, _texto=None):
-        self.salvar()
+        if self.confirmacao is None:
+            self.salvar()
+
+    # ------------------------------------------------------------------
+    # EXCLUIR CONTA (com confirmação: não dá para desfazer)
+    # ------------------------------------------------------------------
+
+    def _confirmar_exclusao(self):
+        ui = self.tela.ui
+        for campo in (self.campo_nome, self.campo_email, self.campo_senha):
+            campo["focus"] = 0                      # o teclado não continua escrevendo nos campos de trás
+        self.confirmacao = Janela(ui, self.tela.ui_root, 1.6, 0.78, t("EXCLUIR CONTA"))
+        p = self.confirmacao.painel
+        ui.texto(p, t("Excluir a conta {nome}?", nome=self.usuario.username), 0, 0.12, 0.036, COR_TEXTO, CENTRO,
+                 negrito=True, largura_max=1.45)
+        ui.texto(p, t("O inventário, o saldo e as estatísticas desta conta são apagados. Não dá para desfazer."),
+                 0, 0.03, 0.025, COR_TEXTO_2, CENTRO, quebra_em=1.4)
+        ui.botao(p, t("CANCELAR"), 0.33, -0.25, 0.48, 0.09, self._cancelar_exclusao, tipo="secundario", escala=0.03)
+        confirmar = ui.botao(p, t("EXCLUIR"), -0.33, -0.25, 0.48, 0.09, self._excluir, tipo="secundario",
+                             escala=0.03)
+        confirmar["text_fg"] = COR_VERMELHO
+
+    def _cancelar_exclusao(self):
+        if self.confirmacao is not None:
+            self.confirmacao.fechar()
+            self.confirmacao = None
+
+    def _excluir(self):
+        self._cancelar_exclusao()
+        if self.controller.delete(self.usuario):
+            view_manager = self.tela.view_manager
+            self.fechar()
+            view_manager.sair()                                   # volta ao login, sem ninguém logado
+            login = view_manager.tela_atual
+            if hasattr(login, "show_message"):
+                login.show_message(t("Conta excluída. Até a próxima!"))
+
+    def _tecla_esc(self):
+        if self.confirmacao is not None:
+            self._cancelar_exclusao()               # ESC fecha só a pergunta
+        else:
+            self.fechar()
 
     @property
     def aberta(self):
@@ -101,6 +148,7 @@ class JanelaMinhaConta:
 
     def _ao_fechar(self):
         self.eventos.ignoreAll()
+        self._cancelar_exclusao()
         self.janela = None
         if self.ao_fechar:
             self.ao_fechar()

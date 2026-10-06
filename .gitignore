@@ -13,3 +13,5 @@ app/assets/maps/de_mirage_d.glb
 tools/cache/
 # sons originais baixados (o jogo usa as cópias em app/assets/sounds)
 app/assets/_sounds/
+# ZIPs de entrega dos Extras (extraia e apague; não vão para o Git)
+*.zip

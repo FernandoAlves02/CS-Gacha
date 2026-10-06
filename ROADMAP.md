@@ -38,7 +38,7 @@
 | 4 | Tela do Mercado (caixas e skins avulsas) | ✅ validada no seu PC e no GitHub (02/10, `570efa8`) |
 | 5 | Inventário real, abertura com roleta, venda, detalhes | ✅ validada no seu PC e no GitHub (02/10, `570efa8`) |
 | 6 | Home viva (animação), vitrine "equipar", Mirage otimizada | ✅ Mirage recortada e cenário carregando no login (correção 4, 02/10: T3.5) · ⏳ animação e vitrine (D12) |
-| Extras | Pedidos de 02 e 03/10 (seção 2.4) | ✅ Extras 1 a 5 validados · 🟦 Extras 6 entregue (seção 10) |
+| Extras | Pedidos de 02 a 05/10 (seção 2.4) | ✅ Extras 1 a 6 validados · 🟦 Extras 7 entregue (seção 10) |
 | 7 | Testes de aceite, documentação, apresentação | ⏳ |
 | — | Coletor de preços contínuo para o histórico (D10) | 🟦 **código pronto**: deixar rodando (T2.6) |
 
@@ -57,12 +57,14 @@
 - **Extras 3 (português/inglês):** **97 testes** automáticos (13 novos; um deles lê o código e confere que **todo texto da tela tem tradução**, com os mesmos valores) e **35 de 35** verificações com o jogo real em inglês (login, cadastro, header, mercado, compra de 4 caixas, inventário, abertura, venda, Minha conta, volta ao português, troca de idioma 8 vezes sem sobrar nada, janela ultralarga). Todas as verificações em português continuam passando. Um revisor independente comparou o português antes e depois em 80.000 valores (dinheiro, chance, variação, float, data): **nenhuma diferença**. Os pontos que ele achou foram corrigidos.
 - **Extras 4 (Home viva e caixa grátis):** **107 testes** automáticos, **40 de 40** verificações com o jogo real (Home com estatísticas e pedestal, modo wallpaper com a tecla H de verdade, caixa grátis da contagem até a abertura, destaque na Home, inglês, nada sobrando depois de 12 trocas de tela), **27 de 27** no banco de conferência (regra dos 10 minutos, inventário cheio, recusas sem gravar nada, estatísticas, destaque de outro jogador) e o autoteste do banco real com **39 de 39**. Um revisor independente achou 1 problema de verdade (o menu da caixa grátis podia reaparecer por cima da roleta) e alguns menores; o bug e os menores que afetam o jogador foram corrigidos e ganharam teste. **O que eu não consigo ver daqui:** o pedestal por cima do mapa real com o PBR (passo 5 do tutorial).
 - **Extras 5 (CONFIGURAÇÕES, tela cheia, sons e cliques maiores):** **112 testes** automáticos e **32 de 32** verificações com o jogo real (cliques de verdade no alto do header, embaixo das abas e acima do link do login; cada opção das CONFIGURAÇÕES; F11; volumes; animações desligadas; os sons disparados em cada ação, contando os "tiques" da roleta). Todas as verificações dos Extras anteriores continuam passando. Um revisor independente conferiu áudio e tela cheia no código-fonte do Panda3D 1.10; os 2 problemas que ele achou (a busca do mercado continuava recebendo teclas com as CONFIGURAÇÕES abertas; F11 não atualizava o botão da janela aberta) foram corrigidos e ganharam teste. **O que eu não consigo ouvir nem ver daqui:** o som de verdade e a tela cheia no seu Windows (passos 3 e 5 do tutorial).
+- **Extras 7 (coletor e EXCLUIR CONTA):** **121 testes** automáticos (6 novos: a passada para na 1ª recusa da Steam, a espera dobra até 6 h, as caixas sempre entram na passada, intervalo configurável, excluir conta, banco fora do ar), **22 de 22** no importador com a Steam simulada (recusando, sem internet, Ctrl+C, modo contínuo) e **10 de 10** com o jogo real (confirmação, ESC, CANCELAR, a conta e os itens saindo do banco, volta ao login).
 - **Extras 6 (skin 3D, pedestal da Mirage, volume fino, loop da música, personagem e poeira):** **115 testes** automáticos e **55 de 55** verificações com o jogo real: arrastar a barra de volume com o mouse de verdade, gravação só quando para de mexer, tag NA HOME seguindo a skin do pedestal, a peça 3D montada a partir do PNG, a inspeção girando com o mouse no Mercado e no inventário (e sumindo junto com a janela), o personagem preso no mapa com a câmera balançando, a poeira acompanhando a câmera e nada sobrando depois de várias trocas de tela. O arquivo da música foi conferido amostra por amostra (a emenda do loop fica contínua). Todas as verificações dos Extras anteriores continuam passando. Um revisor independente achou 5 pontos (o principal: o pedestal mudava o filtro de 4 texturas que o mapa também usa); todos foram corrigidos e ganharam teste. **O que eu não consigo ouvir nem ver daqui:** o som, o mapa com o PBR e o personagem de verdade (passos 3 a 5 do tutorial).
 
 ### 1.1 Próximos passos (na ordem)
 
-1. **Extras 6** (seção 10): testes, checklist e commit. *Sem migração e sem biblioteca nova.*
-2. Deixar o **coletor de preços** rodando (**T2.6**) no fim de semana.
+1. **Extras 7** (seção 10): testes, checklist e commit. *Sem migração e sem biblioteca nova.*
+2. Deixar o **coletor de preços** rodando (**T2.6**) até quinta.
+3. Estudar o **documento de estudo do código** e ensaiar o **roteiro** (15 min) com os slides.
 
 > **O que eu NÃO consegui testar aqui:** a sua **placa de vídeo** (os prints daqui não têm o cenário 3D nem o PBR, e o renderizador por software deixa as imagens um pouco serrilhadas), o **MariaDB do XAMPP** e as **APIs reais**. Por isso cada fase tem o checklist visual no seu PC. Se algo falhar, copie a mensagem inteira e me mande.
 
@@ -122,14 +124,16 @@ Cada regra de jogo é **uma constante** em `app/core/game_rules.py`. Para mudar,
 | 12 | *(03/10)* Configurações | **CONFIGURAÇÕES** no header, no lugar do PT \| EN (o login continua com PT \| EN). Dentro: Minha conta, idioma, **moeda** (Automática, que segue o idioma; R$; US$), sons e animações da Home. Fica salvo no PC, como o idioma | ✅ **Extras 5** (E5) |
 | 13 | *(03/10)* Sons e música | Sons **CC0** (domínio público): [Interface Sounds, da Kenney](https://opengameart.org/content/interface-sounds) e [Main Menu Music (Loop)](https://opengameart.org/content/main-menu-music-loop). Liga/desliga e volume nas Configurações. Os sons da Valve ficaram de fora: a [política da Valve](https://developer.valvesoftware.com/wiki/Mod_Content_Usage) permite em fangame não comercial, mas num repositório público é zona cinzenta | ✅ **Extras 5** (E5) |
 | 14 | *(03/10)* Tela cheia | JANELA / TELA CHEIA nas Configurações e atalho **F11**; a escolha fica salva no PC | ✅ **Extras 5** (E5) |
-| 15 | *(03/10, 10h)* Skin 3D em vez do PNG girando | O PNG **não dá** para "vestir" o modelo 3D da arma (é uma foto da arma pronta, não a textura desembrulhada dela, e só temos o modelo da AK e da AWP). Feito: a própria imagem vira uma **peça sólida** (frente, verso e laterais) | 🟦 **Extras 6** (E6) |
-| 16 | *(03/10, 10h)* Inspeção 3D como no CS | A skin 3D girando com o mouse na imagem ampliada do Mercado e no DETALHES do inventário (caixas continuam com a imagem plana) | 🟦 **Extras 6** (E6) |
-| 17 | *(03/10, 10h)* Volume mais fino | Barra de arrastar de 1 em 1% com **curva** (o volume real é a porcentagem ao cubo) e − / + de 1%. Frações não fazem falta: com a curva, 1% na parte baixa já é um ajuste fino | 🟦 **Extras 6** (E6) |
-| 18 | *(03/10, 10h)* Tag NA HOME automática | A tag segue a skin que **está** no pedestal (a escolhida ou, sem escolha, a mais valiosa); na automática o menu oferece **FIXAR NA HOME** | 🟦 **Extras 6** (E6) |
-| 19 | *(03/10, 10h)* Música com corte no loop | O arquivo tinha 0,35 s de silêncio no começo e o começo de uma batida cortada no fim: recortado no ponto exato (46 compassos) e 8 dB mais baixo | 🟦 **Extras 6** (E6) |
-| 20 | *(03/10, 10h)* Pedestal mais bonito | Texturas da **própria Mirage** que já estão no projeto: degrau de pedra, corpo e tampo de mármore e a faixa decorada das paredes | 🟦 **Extras 6** (E6) |
-| 21 | *(03/10, 10h)* Personagem preso na câmera + animação | Agora fica preso no **mapa** (mesmo lugar de antes). O modelo exportado é a versão "spawnpoint", **sem ossos** (conferido: 0); a animação é uma **respiração e balanço leves por código**. Ossos de verdade: depois da apresentação | 🟦 **Extras 6** (E6) |
-| 22 | *(03/10, 10h)* Partículas na Home | Poeira flutuando e névoa leve, por código, seguindo ANIMAÇÕES DA HOME | 🟦 **Extras 6** (E6) |
+| 15 | *(03/10, 10h)* Skin 3D em vez do PNG girando | O PNG **não dá** para "vestir" o modelo 3D da arma (é uma foto da arma pronta, não a textura desembrulhada dela, e só temos o modelo da AK e da AWP). Feito: a própria imagem vira uma **peça sólida** (frente, verso e laterais) | ✅ **Extras 6** (E6) |
+| 16 | *(03/10, 10h)* Inspeção 3D como no CS | A skin 3D girando com o mouse na imagem ampliada do Mercado e no DETALHES do inventário (caixas continuam com a imagem plana) | ✅ **Extras 6** (E6) |
+| 17 | *(03/10, 10h)* Volume mais fino | Barra de arrastar de 1 em 1% com **curva** (o volume real é a porcentagem ao cubo) e − / + de 1%. Frações não fazem falta: com a curva, 1% na parte baixa já é um ajuste fino | ✅ **Extras 6** (E6) |
+| 18 | *(03/10, 10h)* Tag NA HOME automática | A tag segue a skin que **está** no pedestal (a escolhida ou, sem escolha, a mais valiosa); na automática o menu oferece **FIXAR NA HOME** | ✅ **Extras 6** (E6) |
+| 19 | *(03/10, 10h)* Música com corte no loop | O arquivo tinha 0,35 s de silêncio no começo e o começo de uma batida cortada no fim: recortado no ponto exato (46 compassos) e 8 dB mais baixo | ✅ **Extras 6** (E6) |
+| 20 | *(03/10, 10h)* Pedestal mais bonito | Texturas da **própria Mirage** que já estão no projeto: degrau de pedra, corpo e tampo de mármore e a faixa decorada das paredes | ✅ **Extras 6** (E6) |
+| 21 | *(03/10, 10h)* Personagem preso na câmera + animação | Agora fica preso no **mapa** (mesmo lugar de antes). O modelo exportado é a versão "spawnpoint", **sem ossos** (conferido: 0); a animação é uma **respiração e balanço leves por código**. Ossos de verdade: depois da apresentação | ✅ **Extras 6** (E6) |
+| 22 | *(03/10, 10h)* Partículas na Home | Poeira flutuando e névoa leve, por código, seguindo ANIMAÇÕES DA HOME | ✅ **Extras 6** (E6) |
+| 23 | *(05/10)* Steam bloqueando o coletor por horas | **Sem "bypass"** (trocar IP/proxy é contra as regras da Steam e aumenta o bloqueio). O coletor passou a consultar devagar (1 a cada 20 s), **parar na primeira recusa** e esperar cada vez mais (1 h, 2 h, 4 h, até 6 h); passadas curtas com as caixas sempre | 🟦 **Extras 7** (E7) |
+| 24 | *(05/10)* Ficar mais parecido com o projeto da aula (t8711-crud-produtos) | A base **já segue o padrão da aula** (MVC, `DAO(ABC)` com o CRUD, `Database`, models com `@property`, `X_DAO`/`X_Controller`, hash com salt igual ao `Senha_Utils`). Faltava o **D do CRUD na tela**: **EXCLUIR CONTA** no MINHA CONTA. Não renomeei nada para português: mexeria em quase todos os arquivos a 3 dias da entrega, sem ganho para o jogo; o documento de estudo mostra o "de/para" | 🟦 **Extras 7** (E7) |
 
 Ordem: 2 primeiro (para o coletor juntar histórico das caixas novas no fim de semana), depois 6, 5, 4, 1 e 0, depois 8 (antes dos itens 3 e 7, para eles já nascerem traduzidos), depois 3 e 7.
 
@@ -430,7 +434,7 @@ flush privileges;
    ```bat
    python tools/sync_market.py --so-precos
    ```
-   - A Steam responde **um item por vez** e aceita cerca de 20 consultas por minuto, por isso o script espera 3,2 s entre elas. Para as 6 caixas são ~1.436 preços: **cerca de 1 h 20**.
+   - A Steam responde **um item por vez**. Desde o Extras 7 o script espera **20 s** entre as consultas (com 3,2 s a Steam passou a bloquear o PC por horas) e **para na primeira recusa**. Uma atualização completa leva muitas horas: deixe a T2.6 cuidando disso.
    - A ordem foi pensada para o jogo: primeiro as **caixas**, depois as skins **mais comuns** (as que mais saem nas aberturas) e por último facas e luvas. Em **~25 min** as caixas e as ~420 skins de armas já estão com preço real.
    - Pode deixar rodando num terminal enquanto você trabalha em outra coisa.
    - **Ctrl+C para a qualquer momento sem perder nada:** o progresso é salvo a cada 10 itens, e rodar `--so-precos` de novo continua do que falta.
@@ -503,7 +507,7 @@ git push
    ```bat
    python tools/sync_market.py --so-precos --continuo
    ```
-   Ele faz uma passada completa (~1 h 20), espera 5 min e começa outra. Se a Steam limitar, espera 15 min; se a internet cair, espera 5 min e continua sozinho. **Ctrl+C** encerra sem perder nada.
+   *(Extras 7)* Cada passada consulta **todas as caixas e mais algumas skins** (120 preços, ~40 min), espera 10 min e começa outra; as skins vão "rodando" de passada em passada. Se a Steam **recusar**, a passada para na hora e ele espera **1 h** (depois 2 h, 4 h, no máximo 6 h) antes de tentar de novo; se a internet cair, espera 5 min. **Ctrl+C** encerra sem perder nada.
 4. Pode trabalhar no projeto ao mesmo tempo (jogo, testes e autoteste usam o mesmo banco sem conflito). Só **não rode o `schema.sql`** (regra 2.2).
 
 **Validação** (DBeaver, depois de algumas horas):
@@ -639,7 +643,7 @@ Abrir uma caixa mexe em 3 tabelas: apaga a caixa, desconta a chave e insere a sk
 
 ### 9.4 Como o preço é "real"
 
-O `tools/sync_market.py` monta o nome de mercado de cada item ("AK-47 | Redline (Field-Tested)"), consulta o **mercado da Steam** em R$ e grava no banco a mediana das vendas das últimas 24 h (ou o anúncio mais barato). Ele respeita o limite da Steam (uma consulta a cada 3,2 s), salva o progresso e continua de onde parou. O jogo só lê o banco: rápido e sem depender de internet. Cada preço consultado gera uma linha de histórico.
+O `tools/sync_market.py` monta o nome de mercado de cada item ("AK-47 | Redline (Field-Tested)"), consulta o **mercado da Steam** em R$ e grava no banco a mediana das vendas das últimas 24 h (ou o anúncio mais barato). Ele respeita o limite da Steam (uma consulta a cada 20 s desde o Extras 7, e para na primeira recusa), salva o progresso e continua de onde parou. O jogo só lê o banco: rápido e sem depender de internet. Cada preço consultado gera uma linha de histórico.
 
 ### 9.5 Perguntas prováveis da banca
 
@@ -1004,6 +1008,50 @@ ZIP `cs-gacha-extras-5.zip`, feito a partir do **estado atual do GitHub** (`cab8
 
 **Se der erro:** mande o print e o terminal inteiro.
 
+### Extras 7 — coletor sem bloqueio da Steam e EXCLUIR CONTA (itens 23 e 24) · 10 min
+
+ZIP `cs-gacha-extras-7.zip`, feito a partir do **estado atual do GitHub** (`d737961`, o Extras 6). **Sem migração** e **nenhuma biblioteca nova**.
+
+| Arquivo | Situação | O que é |
+|---|---|---|
+| `tools/sync_market.py` | ALTERADO | 1 consulta a cada **20 s**; **para na primeira recusa** da Steam; no `--continuo`, passadas curtas (todas as caixas + algumas skins) e espera crescente depois de recusa (1 h, 2 h, 4 h, até 6 h); opção `--intervalo` |
+| `app/view/account_window.py` | ALTERADO | Botão **EXCLUIR CONTA** com confirmação |
+| `app/controller/user_controller.py` | ALTERADO | `delete()` devolve se deu certo (para a tela voltar ao login) |
+| `app/core/i18n_en.py`, testes | ALTERADOS | Textos novos em inglês; + 6 testes (121 no total) |
+| `.gitignore` | ALTERADO | Ignora `*.zip` (os ZIPs de entrega não vão mais para o Git) |
+
+**Passos**
+1. `git pull`, extraia o ZIP por cima do projeto e **tire do Git o ZIP do Extras 6** que foi junto no último commit:
+   ```bat
+   git rm cs-gacha-extras-6.zip
+   ```
+2. Testes:
+   ```bat
+   python -m unittest app.unit_tests.test_preferencias app.unit_tests.test_i18n app.unit_tests.test_user_flow app.unit_tests.test_gacha_rules app.unit_tests.test_gacha_controllers app.unit_tests.test_sync_market
+   ```
+   - [ ] `Ran 121 tests` e `OK`.
+3. **Coletor** (pare o que está rodando com Ctrl+C e abra de novo):
+   ```bat
+   python tools/sync_market.py --so-precos --continuo
+   ```
+   - [ ] Aparece `=== Passada 1 (...): 120 preços, ~40 min ===` (as caixas primeiro).
+   - [ ] Se a Steam ainda estiver bloqueando: `Parou antes do fim: a Steam recusou...` e `A Steam recusou: próxima tentativa em 1 h`. **Deixe rodando**: ele mesmo espera.
+4. **EXCLUIR CONTA** (crie uma conta de teste para isso):
+   - [ ] Cadastre `teste_excluir`, entre, abra uma caixa grátis ou compre algo.
+   - [ ] Clique no nome (MINHA CONTA) → **EXCLUIR CONTA** → aparece a pergunta. **ESC** ou **CANCELAR** fecham só a pergunta.
+   - [ ] **EXCLUIR** → volta ao login com "Conta excluída. Até a próxima!". Tentar entrar de novo com ela: "Usuário ou senha inválidos".
+   - [ ] No DBeaver: `select count(*) from skins_instance where user_id = <id dela>;` → 0 (os itens saíram junto).
+5. Commit:
+   ```bat
+   git add -A
+   git commit -m "Extras 7: coletor sem bloqueio da Steam e excluir conta"
+   git push
+   ```
+
+**Como explicar na apresentação**
+- **CRUD completo do usuário**, como no projeto da aula: **C**adastro (tela de login), **R**ead (login e MINHA CONTA), **U**pdate (MINHA CONTA → SALVAR) e **D**elete (EXCLUIR CONTA). Os itens da conta saem junto por causa do `ON DELETE CASCADE` das chaves estrangeiras.
+- **Limite da Steam:** o coletor é um "bom cidadão": consulta devagar, para quando a Steam pede e espera cada vez mais. O jogo nunca depende da internet: ele só lê o banco.
+
 ### Extras 6 — skin 3D, inspeção, pedestal da Mirage, volume fino, loop da música, personagem e poeira (itens 15 a 22) · 20 min
 
 ZIP `cs-gacha-extras-6.zip`, feito a partir do **estado atual do GitHub** (`75f7606`, que já é o Extras 5 validado). **Sem migração** e **nenhuma biblioteca nova** (tudo com o próprio Panda3D).
@@ -1057,7 +1105,7 @@ ZIP `cs-gacha-extras-6.zip`, feito a partir do **estado atual do GitHub** (`75f7
    ```
 
 **Como explicar na apresentação**
-- **Skin 3D sem modelo 3D:** o programa lê a transparência do PNG, acha o **contorno** da arma (algoritmo *marching squares*) e levanta uma "parede" em cada pedaço dele, ligando a imagem da frente à de trás. Funciona para as 1.800 skins sem arquivo novo.
+- **Skin 3D sem modelo 3D:** o programa lê a transparência do PNG, acha o **contorno** da arma (algoritmo *marching squares*) e levanta uma "parede" em cada pedaço dele, ligando a imagem da frente à de trás. Funciona para as 2.126 skins sem arquivo novo.
 - **Camadas da tela:** o mapa (camada 0), a poeira (3), o pedestal (5), a interface (10) e a inspeção (20) são cenas separadas, cada uma na sua **DisplayRegion**. Uma não mexe na luz nem na câmera da outra.
 - **Volume com curva:** o ouvido percebe volume de forma logarítmica; elevar a porcentagem ao cubo espalha a mudança pela barra inteira.
 - **Loop da música:** medimos onde as batidas caem e cortamos o arquivo exatamente em 46 compassos.
@@ -1109,8 +1157,8 @@ ZIP `cs-gacha-extras-6.zip`, feito a partir do **estado atual do GitHub** (`75f7
 |---|---|---|
 | **Sex 02/10** | Correções 3, 4 e 5 ✅ · Fases 4 e 5 ✅ · **Extras 1** (catálogo completo) ✅ · **Extras 2** (busca, Ctrl+A, skin maior, compra múltipla, Minha conta) ✅ · **Extras 3** (português/inglês) ✅ | Fases 4 e 5 validadas ✅ · **Extras 1** (para o coletor pegar as caixas novas) |
 | **Sáb 03/10** | **Extras 4** (Home viva, caixa grátis) ✅ · **Extras 5** (Configurações, tela cheia, sons, cliques) ✅ · **Extras 6** (skin 3D, inspeção, pedestal, volume, loop, personagem, poeira) ✅ | Extras 2 a 5 validados ✅ · integrar Extras 6 |
-| **Dom 04/10** | Ajustes do que você encontrar no Extras 6 | Validar o Extras 6 |
-| **Seg 05/10** | Folga para correções | — |
+| **Dom 04/10** | Ajustes do que você encontrar no Extras 6 | Extras 6 validado ✅ |
+| **Seg 05/10** | **Extras 7** (coletor, EXCLUIR CONTA) · documento de estudo, roteiro e slides | Integrar o Extras 7 · prints dos documentos do SENAC |
 | **Ter–Qua 06–07/10** | Ajustes finos e correções; slides com você | Roteiro de aceite, slides, vídeo |
 | **Qui 08/10** | **Congelar o código** | Dump do banco com o histórico → PC do professor (12.2) · ensaiar |
 | **Sex 09/10** | — | Apresentação |
@@ -1174,8 +1222,8 @@ Depois leve o banco **pronto** do seu PC, que já tem os preços reais **e o his
 |---|---|---|
 | `Unknown column 'api_id'` / `Table 'csgacha.collection_items' doesn't exist` | Banco ainda na versão 1 | Rode `schema.sql` + `seed_base.sql` (T2.3) |
 | "Esta caixa não tem itens cadastrados. Rode o importador..." | Importador não rodou | `python tools/sync_market.py` |
-| Importador: "a Steam pediu uma pausa; aguardando 65s" | Limite de consultas da Steam (HTTP 429) | Normal: ele espera sozinho e continua |
-| Importador: "Parou antes do fim: a Steam limitou as consultas" | 3 pausas seguidas | Espere uns 10 minutos e rode `python tools/sync_market.py --so-precos` (continua do que falta) |
+| Importador: "Parou antes do fim: a Steam recusou as consultas (limite)" | A Steam bloqueou este PC por um tempo (HTTP 429) | **Não insista**: cada tentativa durante o bloqueio aumenta o tempo. No `--continuo` ele espera sozinho (1 h, 2 h, 4 h...). Rodando à mão, espere algumas horas e rode `--so-precos` (continua do que falta). Se acontecer sempre, use `--intervalo 40` |
+| Coletor: "A Steam recusou: próxima tentativa em 2 h" | Recusas seguidas | Normal: deixe rodando. O jogo continua funcionando com os preços que já tem |
 | Importador: "Parou antes do fim: 5 erros de rede seguidos" | Sem internet ou a Steam fora do ar | Confira a internet e rode `--so-precos` de novo |
 | Importador: muitos itens "sem anúncio" | Itens raros sem nenhum à venda no momento | Normal: ficam com o preço estimado até aparecer anúncio |
 | Importador: "Não foi possível baixar ... e não há cópia local" | Sem internet na primeira execução | Rode num PC com internet ou use a opção de exportar o banco (12.2) |

@@ -6,11 +6,16 @@ De onde vêm os dados
    imagens): CSGO-API do ByMykel (arquivos JSON públicos no GitHub, sem chave).
 2. PREÇOS em reais: API pública de preços do MERCADO DA STEAM (priceoverview),
    sem chave, já em R$. É o preço oficial do mercado do CS.
-   A Steam limita as consultas (cerca de 20 por minuto) e responde UM item por
-   vez, por isso a atualização completa demora (~1 h para as 6 caixas padrão).
-   O script consulta primeiro o que importa mais (caixas, depois skins comuns),
+   A Steam limita as consultas e responde UM item por vez. Desde out/2026 ela
+   está bem mais rígida: insistir depois de uma recusa (HTTP 429) deixa o
+   computador bloqueado por horas. Por isso (Extras 7) o script consulta
+   DEVAGAR (um item a cada 20 s), PARA na primeira recusa e, no modo contínuo,
+   espera cada vez mais antes de tentar de novo (1 h, 2 h, 4 h, até 6 h).
+   Ele consulta primeiro o que importa mais (caixas, depois skins comuns),
    salva o progresso a cada 10 itens e pode ser interrompido com Ctrl+C e
    continuado depois: na próxima execução ele começa pelo que ainda falta.
+   Não há "atalho" para fugir do limite (trocar de IP, proxy...): isso é
+   contra as regras da Steam e só aumenta o bloqueio.
 
 O jogo NUNCA acessa a internet: ele só lê o banco. Este script é rodado
 antes (no seu PC e no do professor) para preencher/atualizar o banco.
@@ -26,6 +31,7 @@ Como usar (na raiz do projeto, com o .venv ativado)
     python tools/sync_market.py --so-precos     só atualiza preços (não baixa o catálogo)
     python tools/sync_market.py --limite 100    consulta no máximo 100 preços nesta execução
     python tools/sync_market.py --so-precos --continuo   repete sem parar (histórico para o gráfico)
+    python tools/sync_market.py --so-precos --intervalo 30   consulta ainda mais devagar (1 a cada 30 s)
     python tools/sync_market.py --sem-precos    só catálogo (itens novos com preço estimado)
 
 Pode rodar quantas vezes quiser: ele atualiza o que já existe (não duplica).
@@ -58,16 +64,20 @@ CATALOG_URL = "https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/ap
 STEAM_PRICE_URL = "https://steamcommunity.com/market/priceoverview/?appid=730&currency=7&market_hash_name={nome}"
 USER_AGENT = "CSGacha/1.0 (projeto integrador SENAC)"
 
-STEAM_INTERVALO = 3.2        # segundos entre consultas (a Steam aceita ~20 por minuto)
-STEAM_PAUSA_LIMITE = 65      # segundos de pausa quando a Steam responde "muitas consultas" (429)
-STEAM_MAX_PAUSAS = 3         # pausas seguidas antes de parar (o progresso fica salvo)
+STEAM_INTERVALO = 20         # segundos entre consultas (Extras 7: era 3,2 s e a Steam bloqueava)
 STEAM_MAX_FALHAS = 5         # erros de rede seguidos antes de parar (provavelmente sem internet)
+# Recusa da Steam (HTTP 429, "muitas consultas"): a passada PARA na hora, sem
+# insistir (cada nova tentativa durante o bloqueio só o deixa mais longo).
 SALVAR_A_CADA = 10           # commit no banco a cada N preços
 
-# Modo contínuo (--continuo): passa por todos os itens, espera e começa de novo.
-# Cada passada grava um ponto novo no histórico de cada item (para o gráfico).
-PAUSA_ENTRE_PASSADAS = 5 * 60    # segundos entre uma passada e a próxima
-PAUSA_APOS_LIMITE = 15 * 60      # se a Steam limitou, espera mais antes de continuar
+# Modo contínuo (--continuo): passadas CURTAS, uma atrás da outra. Cada passada
+# consulta TODAS as caixas (são as que aparecem primeiro no mercado e no gráfico)
+# e mais algumas skins (as mais desatualizadas); assim as skins vão "rodando".
+# Cada preço consultado grava um ponto novo no histórico (para o gráfico).
+POR_PASSADA = 120                # preços por passada: as 42 caixas + 78 skins (~40 min, 1 consulta a cada 20 s)
+PAUSA_ENTRE_PASSADAS = 10 * 60   # segundos entre uma passada e a próxima
+PAUSA_APOS_LIMITE = 60 * 60      # 1ª recusa da Steam: espera 1 h; depois dobra (2 h, 4 h...)
+PAUSA_APOS_LIMITE_MAX = 6 * 60 * 60   # ... até no máximo 6 h
 PAUSA_APOS_REDE = 5 * 60         # se a internet caiu, espera e tenta de novo
 
 # Caixas importadas quando nenhuma é informada. Troque à vontade
@@ -506,7 +516,7 @@ def load_price_plan(database):
     return plan_price_updates(case_rows, skin_rows, existing)
 
 
-def update_prices_from_steam(database, tarefas, fetch=None, sleep=None):
+def update_prices_from_steam(database, tarefas, fetch=None, sleep=None, intervalo=None):
     """Consulta a Steam item por item e grava cada preço real (com histórico).
 
     Salva a cada SALVAR_A_CADA itens: se a execução for interrompida (Ctrl+C,
@@ -515,6 +525,7 @@ def update_prices_from_steam(database, tarefas, fetch=None, sleep=None):
     """
     fetch = fetch or fetch_steam_price      # nos testes dá para trocar por uma Steam "de mentira"
     sleep = sleep or time.sleep
+    intervalo = STEAM_INTERVALO if intervalo is None else intervalo
     total = {"reais": 0, "sem_anuncio": 0, "falhas": 0, "consultados": 0, "parada": None, "motivo": None}
     connection = database.connect()
     cursor = connection.cursor(buffered=True)
@@ -522,30 +533,23 @@ def update_prices_from_steam(database, tarefas, fetch=None, sleep=None):
     inicio = time.time()
     try:
         for numero, (tipo, item_id, wear, nome) in enumerate(tarefas, start=1):
-            # --- consulta (com pausas automáticas se a Steam pedir) ---
-            dados, pausas = None, 0
-            while True:
-                try:
-                    dados = fetch(nome)
-                    falhas_seguidas = 0
-                    break
-                except SteamLimite:
-                    pausas += 1
-                    if pausas > STEAM_MAX_PAUSAS:
-                        total["parada"] = "a Steam limitou as consultas; rode de novo daqui a uns 10 minutos"
-                        total["motivo"] = "limite"
-                        break
-                    print(f"  ... a Steam pediu uma pausa; aguardando {STEAM_PAUSA_LIMITE}s "
-                          f"({pausas}/{STEAM_MAX_PAUSAS})")
-                    connection.commit()
-                    sleep(STEAM_PAUSA_LIMITE)
-                except RuntimeError as error:
-                    falhas_seguidas += 1
-                    total["falhas"] += 1
-                    if falhas_seguidas >= STEAM_MAX_FALHAS:
-                        total["parada"] = f"{STEAM_MAX_FALHAS} erros de rede seguidos ({error})"
-                        total["motivo"] = "rede"
-                    break
+            # --- consulta ---
+            dados = None
+            try:
+                dados = fetch(nome)
+                falhas_seguidas = 0
+            except SteamLimite:
+                # Recusa da Steam: para JÁ (insistir só aumenta o bloqueio). O que já
+                # foi consultado está salvo; a próxima execução continua daqui.
+                total["parada"] = ("a Steam recusou as consultas (limite); espere algumas horas "
+                                   "antes de rodar de novo")
+                total["motivo"] = "limite"
+            except RuntimeError as error:
+                falhas_seguidas += 1
+                total["falhas"] += 1
+                if falhas_seguidas >= STEAM_MAX_FALHAS:
+                    total["parada"] = f"{STEAM_MAX_FALHAS} erros de rede seguidos ({error})"
+                    total["motivo"] = "rede"
             if total["parada"]:
                 break
             total["consultados"] += 1
@@ -599,7 +603,7 @@ def update_prices_from_steam(database, tarefas, fetch=None, sleep=None):
                 print(f"  [{numero}/{len(tarefas)}] {nome}: {preco_txt}  (faltam ~{restante:.0f} min)")
 
             if numero < len(tarefas):
-                sleep(STEAM_INTERVALO)
+                sleep(intervalo)
 
         connection.commit()
         return total
@@ -616,17 +620,29 @@ def update_prices_from_steam(database, tarefas, fetch=None, sleep=None):
         database.disconnect(cursor, connection)
 
 
-def wait_before_next_pass(total):
+def wait_before_next_pass(total, recusas_seguidas=1):
     """Modo contínuo: quantos segundos esperar antes da próxima passada.
-    Devolve None quando é para encerrar (o usuário apertou Ctrl+C)."""
+
+    recusas_seguidas: quantas passadas SEGUIDAS a Steam recusou (contando esta).
+    A espera dobra a cada recusa (1 h, 2 h, 4 h...) até PAUSA_APOS_LIMITE_MAX.
+    Devolve None quando é para encerrar (o usuário apertou Ctrl+C).
+    """
     motivo = total.get("motivo")
     if motivo == "ctrlc":
         return None
     if motivo == "limite":
-        return PAUSA_APOS_LIMITE
+        return min(PAUSA_APOS_LIMITE * 2 ** max(0, recusas_seguidas - 1), PAUSA_APOS_LIMITE_MAX)
     if motivo == "rede":
         return PAUSA_APOS_REDE
     return PAUSA_ENTRE_PASSADAS
+
+
+def tasks_for_pass(tarefas, por_passada):
+    """Modo contínuo: TODAS as caixas primeiro e o resto da passada com skins
+    (na ordem do plano: sem preço real primeiro, depois as mais desatualizadas)."""
+    caixas = [t for t in tarefas if t[0] == "caixa"]
+    skins = [t for t in tarefas if t[0] != "caixa"]
+    return caixas + skins[:max(0, por_passada - len(caixas))]
 
 
 # ======================================================================
@@ -679,35 +695,40 @@ def _print_total(total):
         print(f"  ! Parou antes do fim: {total['parada']}.")
 
 
-def run_continuous(database, limite=None, sleep=None, max_passadas=None):
+def run_continuous(database, limite=None, sleep=None, max_passadas=None, intervalo=None):
     """--continuo: repete as passadas de preço até o usuário apertar Ctrl+C.
 
-    Cada passada consulta todos os itens (primeiro os sem preço real, depois
-    os mais desatualizados) e grava um ponto novo em price_history. Deixando
-    rodando um fim de semana, cada item ganha dezenas de pontos no histórico.
-    Se a Steam limitar ou a internet cair, ele espera e continua sozinho.
-    max_passadas existe só para os testes.
+    Cada passada (curta) consulta as caixas e algumas skins (ver tasks_for_pass)
+    e grava um ponto novo em price_history para cada uma. Se a Steam recusar,
+    a passada para na hora e a espera até a próxima cresce (1 h, 2 h, 4 h...);
+    se a internet cair, espera e continua sozinho.
+    limite: preços por passada (padrão POR_PASSADA). max_passadas só para os testes.
     """
     sleep = sleep or time.sleep
+    intervalo = STEAM_INTERVALO if intervalo is None else intervalo
+    por_passada = limite or POR_PASSADA
     passada = 0
+    recusas_seguidas = 0
     print("3/4 Modo contínuo: atualizando preços sem parar. Ctrl+C encerra (o progresso fica salvo).")
     print("    Deixe o XAMPP ligado e o computador sem suspender (Configurações > Energia).")
     while True:
         passada += 1
-        tarefas = load_price_plan(database)
-        if limite:
-            tarefas = tarefas[:limite]
+        tarefas = tasks_for_pass(load_price_plan(database), por_passada)
         inicio = datetime.now().strftime("%d/%m %H:%M")
         print(f"\n=== Passada {passada} ({inicio}): {len(tarefas)} preços, "
-              f"~{len(tarefas) * STEAM_INTERVALO / 60:.0f} min ===")
-        total = update_prices_from_steam(database, tarefas, sleep=sleep)
+              f"~{len(tarefas) * intervalo / 60:.0f} min ===")
+        total = update_prices_from_steam(database, tarefas, sleep=sleep, intervalo=intervalo)
         _print_total(total)
 
-        espera = wait_before_next_pass(total)
+        recusas_seguidas = recusas_seguidas + 1 if total.get("motivo") == "limite" else 0
+        espera = wait_before_next_pass(total, recusas_seguidas)
         if espera is None or (max_passadas and passada >= max_passadas):
             print(f"\nModo contínuo encerrado depois de {passada} passada(s).")
             return passada
-        print(f"    Próxima passada em {espera // 60} min (Ctrl+C para encerrar).")
+        if espera >= 3600:
+            print(f"    A Steam recusou: próxima tentativa em {espera / 3600:.0f} h (Ctrl+C para encerrar).")
+        else:
+            print(f"    Próxima passada em {espera // 60} min (Ctrl+C para encerrar).")
         try:
             sleep(espera)
         except KeyboardInterrupt:
@@ -734,7 +755,10 @@ def main(argv=None):
     parser.add_argument("--imagens", action="store_true", help="baixa as imagens para app/assets/items")
     parser.add_argument("--sem-precos", action="store_true", help="não consulta a Steam (preços estimados)")
     parser.add_argument("--so-precos", action="store_true", help="só atualiza preços (não baixa o catálogo)")
-    parser.add_argument("--limite", type=int, metavar="N", help="consulta no máximo N preços nesta execução")
+    parser.add_argument("--limite", type=int, metavar="N",
+                        help="consulta no máximo N preços nesta execução (no --continuo: por passada)")
+    parser.add_argument("--intervalo", type=float, metavar="SEG",
+                        help=f"segundos entre uma consulta e outra (padrão {STEAM_INTERVALO})")
     parser.add_argument("--continuo", action="store_true",
                         help="repete a consulta de preços sem parar (para montar o histórico); Ctrl+C encerra")
     args = parser.parse_args(argv)
@@ -791,18 +815,20 @@ def main(argv=None):
     if args.sem_precos:
         print("3/4 Preços: pulado (--sem-precos).")
     elif args.continuo:
-        run_continuous(database, args.limite)
+        run_continuous(database, args.limite, intervalo=args.intervalo)
         return 0
     else:
         tarefas = load_price_plan(database)
         if args.limite:
             tarefas = tarefas[:args.limite]
         n_tarefas = len(tarefas)
-        minutos = n_tarefas * STEAM_INTERVALO / 60
-        print(f"3/4 Consultando {len(tarefas)} preços em R$ no mercado da Steam (~{minutos:.0f} min).")
+        intervalo = STEAM_INTERVALO if args.intervalo is None else args.intervalo
+        minutos = n_tarefas * intervalo / 60
+        duracao = f"~{minutos:.0f} min" if minutos < 120 else f"~{minutos / 60:.0f} h"
+        print(f"3/4 Consultando {len(tarefas)} preços em R$ no mercado da Steam ({duracao}).")
         print("    Pode interromper com Ctrl+C a qualquer momento: o progresso fica salvo e")
         print("    a próxima execução continua do que falta.")
-        total = update_prices_from_steam(database, tarefas)
+        total = update_prices_from_steam(database, tarefas, intervalo=intervalo)
         _print_total(total)
 
     if args.imagens:

@@ -60,6 +60,13 @@ class FakeDAO:
         self.users[user.email] = copy.copy(user)
         return True
 
+    def delete(self, entity_id):
+        for email, user in list(self.users.items()):
+            if user.id == entity_id:
+                del self.users[email]
+                return True
+        return False
+
 
 class PasswordUtilsTests(unittest.TestCase):
 
@@ -163,6 +170,30 @@ class UserControllerTests(unittest.TestCase):
         self.assertIsNone(user.password)
         self.assertEqual(user.balance, Decimal("500"))
         self.assertTrue(view.messages[-1][1])
+
+
+class UserDeleteTests(unittest.TestCase):
+    """Minha conta -> EXCLUIR CONTA: o "D" do CRUD (como no projeto da aula)."""
+
+    def test_excluir_conta(self):
+        dao = FakeDAO()
+        User_Controller(dao, FakeView(register_data=("ana", "segredo123", "ana@x.com"))).save()
+        user = dao.get_by_email("ana@x.com")
+        view = FakeView()
+        self.assertTrue(User_Controller(dao, view).delete(user))
+        self.assertIsNone(dao.get_by_email("ana@x.com"))
+        self.assertEqual(view.messages[-1], ("Usuário excluído com sucesso!", True))
+        self.assertFalse(User_Controller(dao, view).delete(user))          # já não existe
+        self.assertEqual(view.messages[-1], ("Usuário não encontrado.", False))
+
+    def test_banco_fora_do_ar_nao_derruba_a_tela(self):
+        class DaoQuebrado:
+            def delete(self, entity_id):
+                raise RuntimeError("banco caiu")
+        view = FakeView()
+        with self.assertLogs("app.controller.user_controller", level="ERROR"):
+            self.assertFalse(User_Controller(DaoQuebrado(), view).delete(User(1, "ana", None, "a@x.com", 0)))
+        self.assertEqual(view.messages[-1], ("Problemas ao excluir usuário", False))
 
 
 class UserUpdateTests(unittest.TestCase):

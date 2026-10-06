@@ -80,12 +80,16 @@ class User_Controller:
             self.view.show_message(t("Usuário atualizado com sucesso!"))
 
     def delete(self, user):
+        """Exclui a conta (o "D" do CRUD). Os itens dela saem junto (ON DELETE CASCADE
+        no banco). Devolve True/False para a tela saber se volta ao login."""
         try:
             success = self.dao.delete(user.id)
             if success:
                 self.view.show_message(t("Usuário excluído com sucesso!"))
             else:
                 self.view.show_message(t("Usuário não encontrado."), False)
+            return success
         except Exception:
             logger.exception("Falha ao excluir usuário")
             self.view.show_message(t("Problemas ao excluir usuário"), False)
+            return False

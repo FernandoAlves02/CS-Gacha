@@ -72,6 +72,12 @@ TEXTOS_EN = {
     "COMPRAR": "BUY",
     "COMPRAR {n}x": "BUY {n}x",
     "CANCELAR": "CANCEL",
+    "EXCLUIR CONTA": "DELETE ACCOUNT",
+    "EXCLUIR": "DELETE",
+    "Excluir a conta {nome}?": "Delete the account {nome}?",
+    "O inventário, o saldo e as estatísticas desta conta são apagados. Não dá para desfazer.":
+        "The inventory, balance and statistics of this account are erased. This cannot be undone.",
+    "Conta excluída. Até a próxima!": "Account deleted. See you next time!",
     "ESTIMADO": "ESTIMATED",
     "estimado": "estimated",
     "SEM PINTURA": "NOT PAINTED",
